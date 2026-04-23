@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Planetary Gear Suite | Tier 1 OpenSource</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚙️</text></svg>">
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    
+    <!-- Babel for in-browser JSX compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Three.js & OrbitControls for Hardware Accelerated 3D Preview -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body { margin: 0; background-color: #0f172a; overflow: hidden; touch-action: none; font-family: sans-serif; }
+        /* Custom Scrollbar for Settings Panel */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Range slider styling overrides */
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+        input[type=range] {
+            -webkit-appearance: none;
+            background: transparent;
+            height: 24px;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 14px;
+            width: 14px;
+            border-radius: 50%;
+            background: currentColor;
+            cursor: pointer;
+            margin-top: -5px;
+            box-shadow: 0 0 0 2px #0f172a;
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #334155;
+            border-radius: 2px;
+        }
+        
+        .glass-panel { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        /* ====================================================================
+          PLANETARY GEAR SUITE - TIER 1 (FREE COMMUNITY EDITION)
+          LICENSE: MIT License
+          
+          This is the open-source community edition of the Planetary Gear Suite.
+          It includes full 2D profiling and exports (SVG, DXF) for laser 
+          cutting, CNC routing, and blueprinting.
+          
+          SUPPORT THE PROJECT:
+          ☕ Buy me a coffee: https://buymeacoffee.com/shinjuku1
+          
+          NEED 3D EXPORTS & ANALYTICS?
+          🛠️ Upgrade to Tier 2 (MAKER) for 3D Mesh (OBJ/STL) & Helix/Bevel features.
+             Link: https://m87.lemonsqueezy.com/checkout/buy/25be5fef-a293-4d93-89ea-2c64810bb275
+          🚀 Upgrade to Tier 3 (PRO) for Solid B-Rep STEP, QC, & Stress Analytics.
+             Link: https://m87.lemonsqueezy.com/checkout/buy/63d6f42c-d4bf-4de5-b1c3-5c9cb39d05a1
+          ====================================================================
+        */
+
+        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+
+        // --- Inline Icon Components ---
+        const Settings = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
+        const Play = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>);
+        const Pause = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>);
+        const Download = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>);
+        const PenTool = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>);
+        const CheckCircle2 = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>);
+        const ChevronDown = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>);
+        const ChevronRight = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>);
+        const MousePointer2 = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 4 7.2 16.8a1 1 0 0 0 1.8.1l4-8 8-4a1 1 0 0 0 .1-1.8L4 2Z"/></svg>);
+        const ListTree = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M12 12s-3-1-3-4V4"/><path d="M9 8v12"/></svg>);
+        const Focus = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="3"/><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>);
+        const Save = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>);
+        const XIcon = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>);
+        const ShieldCheck = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>);
+
+        // --- Math Helpers ---
+        const invAngle = (alpha) => Math.tan(alpha) - alpha;
+
+        // --- Constants ---
+        const PLANET_COLORS = [0x3B82F6, 0x8B5CF6, 0xEC4899, 0x14B8A6, 0xF97316, 0x06B6D4, 0xD946EF, 0x84CC16];
+        const SUN_COLOR = 0xF59E0B;
+        const RING_COLOR = 0xEF4444;
+        const CARRIER_COLOR = 0x10B981;
+
+        // --- Custom Hook for Local Storage ---
+        function useLocalStorage(key, initialValue) {
+          const [storedValue, setStoredValue] = useState(() => {
+            try {
+              const item = window.localStorage.getItem(key);
+              return item ? JSON.parse(item) : initialValue;
+            } catch (error) {
+              return initialValue;
+            }
+          });
+          useEffect(() => { window.localStorage.setItem(key, JSON.stringify(storedValue)); }, [key, storedValue]);
+          return [storedValue, setStoredValue];
+        }
+
+        // --- UI Components ---
+        const Panel = ({ title, defaultOpen = false, children }) => {
+            const [isOpen, setIsOpen] = useState(defaultOpen);
+            return (
+                <div className="border border-slate-800/80 rounded-lg bg-slate-900/50 overflow-hidden mb-3">
+                    <button 
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="w-full p-3 flex justify-between items-center bg-slate-800/40 hover:bg-slate-800/80 transition-colors focus:outline-none"
+                    >
+                        <span className="font-semibold text-slate-200 text-sm tracking-wide">{title}</span>
+                        <span className="text-slate-400">
+                            {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        </span>
+                    </button>
+                    {isOpen && <div className="p-4 space-y-5 bg-slate-900/20">{children}</div>}
+                </div>
+            );
+        };
+
+        const NumberInput = ({ value, onChange, min, max, step, colorClass, widthClass, validArray }) => {
+            const handleBlur = (e) => {
+                let val = parseFloat(e.target.value) || 0;
+                if (validArray && validArray.length > 0 && !validArray.includes(val)) {
+                    val = validArray.reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+                }
+                onChange(val);
+            };
+
+            return (
+                <input 
+                    type="number" 
+                    value={value} 
+                    min={min} 
+                    max={max} 
+                    step={step}
+                    onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+                    onBlur={handleBlur}
+                    className={`bg-slate-950 border border-slate-700 p-1 rounded text-center font-mono focus:outline-none focus:border-slate-500 ${colorClass || ''} ${widthClass || 'w-16'}`}
+                />
+            );
+        };
+
+        const StatRow = ({ label, value, symbol }) => (
+            <div className="flex justify-between items-center py-1.5 border-b border-slate-800/50 last:border-0">
+                <span className="text-slate-400 text-xs flex items-center gap-1">
+                    {label} {symbol && <span className="italic opacity-50 font-serif">({symbol})</span>}
+                </span>
+                <span className="font-mono text-slate-200 text-xs">{value}</span>
+            </div>
+        );
+
+        // --- Smart RDP Vector Optimization Algorithm ---
+        const simplifyRDP = (pts, epsilon) => {
+            if (pts.length <= 2 || epsilon === 0) return pts;
+            let dmax = 0, index = 0, end = pts.length - 1;
+            const p1 = pts[0], p2 = pts[end];
+            const dx = p2.x - p1.x, dy = p2.y - p1.y;
+            const magSq = dx * dx + dy * dy;
+            
+            for (let i = 1; i < end; i++) {
+                const p = pts[i];
+                let d = 0;
+                if (magSq === 0) {
+                    d = Math.hypot(p.x - p1.x, p.y - p1.y);
+                } else {
+                    let t = ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / magSq;
+                    t = Math.max(0, Math.min(1, t));
+                    const projX = p1.x + t * dx;
+                    const projY = p1.y + t * dy;
+                    d = Math.hypot(p.x - projX, p.y - projY);
+                }
+                if (d > dmax) { index = i; dmax = d; }
+            }
+            if (dmax > epsilon) {
+                const r1 = simplifyRDP(pts.slice(0, index + 1), epsilon);
+                const r2 = simplifyRDP(pts.slice(index), epsilon);
+                return r1.slice(0, r1.length - 1).concat(r2);
+            } else {
+                return [pts[0], pts[end]];
+            }
+        };
+
+        const disposeNode = (node) => {
+            if (!node) return; 
+            if (node.geometry && typeof node.geometry.dispose === 'function') node.geometry.dispose();
+            if (node.material) {
+                if (Array.isArray(node.material)) {
+                    node.material.forEach(m => { if (m && typeof m.dispose === 'function') m.dispose(); });
+                } else if (typeof node.material.dispose === 'function') {
+                    node.material.dispose();
+                }
+            }
+            if (node.children && Array.isArray(node.children)) {
+                [...node.children].forEach(child => disposeNode(child));
+            }
+        };
+
+        // ====================================================================
+        // THE MAIN GEAR ENGINE APP
+        // ====================================================================
+        function App() {
+          // 0. UI State
+          const [leftOpen, setLeftOpen] = useState(true);
+          const [rightOpen, setRightOpen] = useState(true);
+
+          useEffect(() => {
+              if (window.innerWidth < 1024) {
+                  setLeftOpen(false);
+                  setRightOpen(false);
+              }
+          }, []);
+
+          // 1. Core Params
+          const [sunTeeth, setSunTeeth] = useLocalStorage('pg_sunTeeth', 15);
+          const [planetTeeth, setPlanetTeeth] = useLocalStorage('pg_planetTeeth', 12);
+          const [numPlanets, setNumPlanets] = useLocalStorage('pg_numPlanets', 3);
+          const [moduleSize, setModuleSize] = useLocalStorage('pg_moduleSize', 3);
+          
+          // Profile Shifts
+          const [sunShift, setSunShift] = useLocalStorage('pg_sunShift', 0.0);
+          const [planetShift, setPlanetShift] = useLocalStorage('pg_planetShift', 0.0);
+          const [ringShift, setRingShift] = useLocalStorage('pg_ringShift', 0.0);
+
+          // 2. Clearances
+          const [pressureAngle, setPressureAngle] = useLocalStorage('pg_pressureAngle', 20);
+          const [clearance, setClearance] = useLocalStorage('pg_clearance', 0.25);
+          const [backlash, setBacklash] = useLocalStorage('pg_backlash', 0.4); 
+          
+          // 3. Dimensions
+          const [gearThickness, setGearThickness] = useLocalStorage('pg_gearThickness', 10);
+          const [ringThickness, setRingThickness] = useLocalStorage('pg_ringThickness', 12);
+          const [sunHole, setSunHole] = useLocalStorage('pg_sunHole', 10);
+          const [planetHole, setPlanetHole] = useLocalStorage('pg_planetHole', 8);
+
+          // 5. Display Options
+          const [fixedPart, setFixedPart] = useLocalStorage('pg_fixedPart', 'ring');
+          const [speed, setSpeed] = useLocalStorage('pg_speed', 50);
+          const [isPlaying, setIsPlaying] = useLocalStorage('pg_isPlaying', true);
+          const [showCarrier, setShowCarrier] = useLocalStorage('pg_showCarrier', true);
+
+          // Three.js References
+          const mountRef = useRef(null);
+          const sceneRef = useRef(new THREE.Scene());
+          const rendererRef = useRef(null);
+          const cameraRef = useRef(null);
+          const controlsRef = useRef(null);
+          const meshesRef = useRef({});
+          const timeRef = useRef(0);
+          const renderRequestRef = useRef(true); 
+          const initializedCamera = useRef(false);
+          const panOffset = useRef({ x: 0, y: 0 }); 
+
+          // --- PERFORMANCE: Cache Materials to prevent GC stuttering ---
+          const materialsRef = useRef({
+              sun: new THREE.MeshStandardMaterial({ color: SUN_COLOR, metalness: 0.2, roughness: 0.4 }),
+              ring: new THREE.MeshStandardMaterial({ color: RING_COLOR, metalness: 0.2, roughness: 0.4, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
+              carrier: new THREE.MeshStandardMaterial({ color: CARRIER_COLOR, transparent: true, opacity: 0.2, depthWrite: false }),
+              planets: PLANET_COLORS.map(c => new THREE.MeshStandardMaterial({ color: c, metalness: 0.2, roughness: 0.4 }))
+          });
+
+          // --- Import / Export / Defaults ---
+          const exportSettings = () => {
+              const keys = Object.keys(window.localStorage).filter(k => k.startsWith('pg_'));
+              const settings = {};
+              keys.forEach(k => settings[k] = JSON.parse(window.localStorage.getItem(k)));
+              const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `planetary-gear-profile.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+          };
+
+          const importSettings = (e) => {
+              const file = e.target.files[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                  try {
+                      const settings = JSON.parse(event.target.result);
+                      Object.keys(settings).forEach(k => {
+                          if (k.startsWith('pg_')) window.localStorage.setItem(k, JSON.stringify(settings[k]));
+                      });
+                      window.location.reload();
+                  } catch(err) {
+                      alert("Invalid profile file.");
+                  }
+              };
+              reader.readAsText(file);
+          };
+
+          const resetDefaults = () => {
+              if (window.confirm("Reset all settings to original defaults?")) {
+                  Object.keys(window.localStorage).forEach(k => {
+                      if (k.startsWith('pg_')) window.localStorage.removeItem(k);
+                  });
+                  window.location.reload();
+              }
+          };
+
+          const isValidParams = useCallback((s, p, n) => {
+            if ((2 * s + 2 * p) % n !== 0) return false;
+            const minDistance = (s + p) * Math.sin(Math.PI / n);
+            const requiredDistance = p + 2.1; 
+            if (minDistance <= requiredDistance) return false;
+            return true;
+          }, []);
+
+          const validS = useMemo(() => {
+            let valid = [];
+            for (let i = 8; i <= 100; i++) if (isValidParams(i, planetTeeth, numPlanets)) valid.push(i);
+            return valid.length ? valid : [sunTeeth];
+          }, [planetTeeth, numPlanets, isValidParams, sunTeeth]);
+
+          const validP = useMemo(() => {
+            let valid = [];
+            for (let i = 8; i <= 50; i++) if (isValidParams(sunTeeth, i, numPlanets)) valid.push(i);
+            return valid.length ? valid : [planetTeeth];
+          }, [sunTeeth, numPlanets, isValidParams, planetTeeth]);
+
+          const validN = useMemo(() => {
+            let valid = [];
+            for (let i = 2; i <= 20; i++) if (isValidParams(sunTeeth, planetTeeth, i)) valid.push(i);
+            return valid.length ? valid : [numPlanets];
+          }, [sunTeeth, planetTeeth, isValidParams, numPlanets]);
+
+          // MATH: Center Distance & Working Pressure Angle Calculation
+          const paRad = pressureAngle * (Math.PI / 180);
+          
+          const invAlphaW = useMemo(() => {
+              return invAngle(paRad) + 2 * ((sunShift + planetShift) / (sunTeeth + planetTeeth)) * Math.tan(paRad);
+          }, [paRad, sunShift, planetShift, sunTeeth, planetTeeth]);
+          
+          const alphaW = useMemo(() => {
+              let a = paRad, b = Math.PI / 2.1;
+              if (invAlphaW <= invAngle(paRad)) return paRad; 
+              for (let i = 0; i < 15; i++) {
+                  let mid = (a + b) / 2;
+                  if (invAngle(mid) < invAlphaW) a = mid; else b = mid;
+              }
+              return (a + b) / 2;
+          }, [invAlphaW, paRad]);
+
+          // True operative center distance with profile shift applied
+          const r_c = ((sunTeeth + planetTeeth) * moduleSize * Math.cos(paRad)) / (2 * Math.cos(alphaW));
+
+          const ringTeeth = sunTeeth + 2 * planetTeeth;
+          const r_s = (sunTeeth * moduleSize) / 2;
+          const r_p = (planetTeeth * moduleSize) / 2;
+          const r_r = (ringTeeth * moduleSize) / 2; // Nominal
+
+          const maxSunHole = Math.max(1, Math.floor((sunTeeth * moduleSize) - (3 * moduleSize)));
+          const maxPlanetHole = Math.max(1, Math.floor((planetTeeth * moduleSize) - (3 * moduleSize)));
+          const safeSunHole = Math.min(sunHole, maxSunHole);
+          const safePlanetHole = Math.min(planetHole, maxPlanetHole);
+
+          const calculateSpeeds = useCallback(() => {
+            const S = sunTeeth;
+            const R = ringTeeth;
+            const baseSpeedInput = (speed / 100) * 0.05;
+            let w_s = 0, w_c = 0, w_r = 0;
+
+            if (fixedPart === 'ring') {
+              w_r = 0; w_s = baseSpeedInput; w_c = w_s * S / (S + R);
+            } else if (fixedPart === 'sun') {
+              w_s = 0; w_r = baseSpeedInput; w_c = w_r * R / (S + R);
+            } else if (fixedPart === 'carrier') {
+              w_c = 0; w_s = baseSpeedInput; w_r = -w_s * S / R;
+            }
+            return { w_s, w_c, w_r };
+          }, [sunTeeth, ringTeeth, fixedPart, speed]);
+
+          const gearRatioText = () => {
+            const S = sunTeeth;
+            const R = ringTeeth;
+            let ratio = 1;
+            if (fixedPart === 'ring') {
+              ratio = (S + R) / S;
+              return `1 : ${ratio.toFixed(2)}`;
+            } else if (fixedPart === 'sun') {
+              ratio = (S + R) / R;
+              return `1 : ${ratio.toFixed(2)}`;
+            } else if (fixedPart === 'carrier') {
+              ratio = R / S;
+              return `1 : -${ratio.toFixed(2)}`;
+            }
+          };
+
+          const calculateSpeedsRef = useRef(calculateSpeeds);
+          const isPlayingRef = useRef(isPlaying);
+          useEffect(() => { calculateSpeedsRef.current = calculateSpeeds; }, [calculateSpeeds]);
+          useEffect(() => { isPlayingRef.current = isPlaying; renderRequestRef.current = true; }, [isPlaying]);
+
+          // --- SMART RDP VECTORIZED INVOLUTE GENERATOR (WITH PROFILE SHIFT) ---
+          const generateGearSegments = useCallback((teeth, pitchRadius, mod, isInternal, profileShift = 0, isPreview = false, resolution = 'Medium') => {
+            const paRad = pressureAngle * (Math.PI / 180);
+            const baseRadius = pitchRadius * Math.cos(paRad);
+            
+            // Adjust Addendum and Dedendum via profile shift
+            const addendum = mod * (1 + profileShift);
+            const dedendum = mod * (1 + clearance - profileShift);
+
+            // Safely adjust Root and Tip limits
+            const tipRadius = isInternal ? pitchRadius - mod * (1 - profileShift) : pitchRadius + addendum;
+            const rootRadius = isInternal ? pitchRadius + mod * (1 + clearance + profileShift) : pitchRadius - dedendum;
+
+            const anglePerTooth = (Math.PI * 2) / teeth;
+            // Shift modifies tooth thickness at pitch circle
+            const halfToothAngleAtPitch = (Math.PI / 2 + 2 * profileShift * Math.tan(paRad)) / teeth;
+            const backlashAngle = backlash / (2 * pitchRadius);
+
+            const inv = (r) => {
+              if (r <= baseRadius) return 0;
+              const alpha = Math.acos(baseRadius / r);
+              return Math.tan(alpha) - alpha;
+            };
+            const pitchInv = inv(pitchRadius);
+
+            let epsilon = 0;
+            let steps = 6; 
+            let arcSteps = 2; 
+            
+            if (!isPreview) {
+                if (resolution === 'High') { steps = 20; arcSteps = 8; epsilon = 0.01; }
+                else if (resolution === 'Medium') { steps = 10; arcSteps = 4; epsilon = 0.05; } 
+                else { steps = 6; arcSteps = 2; epsilon = 0.15; }
+            } else {
+                steps = 4; arcSteps = 1; epsilon = 0.3;
+            }
+
+            let segments = []; 
+
+            for (let i = 0; i < teeth; i++) {
+              let centerAngle = i * anglePerTooth;
+              let leftProfile = [];
+              let rightProfile = [];
+
+              const rInner = isInternal ? tipRadius : rootRadius;
+              const rOuter = isInternal ? rootRadius : tipRadius;
+
+              for (let j = 0; j <= steps; j++) {
+                const t = j / steps;
+                const easedT = 0.5 - 0.5 * Math.cos(t * Math.PI);
+                const r = rInner + (rOuter - rInner) * easedT;
+
+                // Ensure involute curve math clamps properly to base circle
+                const rCalc = Math.max(r, baseRadius);
+                const thetaInv = inv(rCalc);
+
+                let angleOffset = halfToothAngleAtPitch + pitchInv - thetaInv;
+                
+                if (isInternal) {
+                    angleOffset += backlashAngle; 
+                } else {
+                    angleOffset -= backlashAngle;
+                }
+                
+                angleOffset = Math.max(0.0001, angleOffset); 
+
+                // r uses true radius allowing radial generation below base circle
+                leftProfile.push({ r, theta: centerAngle - angleOffset });
+                rightProfile.unshift({ r, theta: centerAngle + angleOffset });
+              }
+
+              let leftPts = leftProfile.map(p => ({ x: p.r * Math.cos(p.theta), y: p.r * Math.sin(p.theta) }));
+              if (epsilon > 0) leftPts = simplifyRDP(leftPts, epsilon);
+              
+              let topPts = [];
+              const rTop = rOuter;
+              const tts = leftProfile[leftProfile.length - 1].theta;
+              let tte = rightProfile[0].theta;
+              if (Math.abs(tte - tts) < 1e-4) tte = tts + 1e-4; 
+              
+              for (let a = 0; a <= arcSteps; a++) {
+                  const theta = tts + (tte - tts) * (a / arcSteps);
+                  topPts.push({ x: rTop * Math.cos(theta), y: rTop * Math.sin(theta) });
+              }
+              if (epsilon > 0) topPts = simplifyRDP(topPts, epsilon);
+
+              let rightPts = rightProfile.map(p => ({ x: p.r * Math.cos(p.theta), y: p.r * Math.sin(p.theta) }));
+              if (epsilon > 0) rightPts = simplifyRDP(rightPts, epsilon);
+
+              let botPts = [];
+              const rBot = rInner;
+              const tbs = rightProfile[rightProfile.length - 1].theta;
+              let tbe = (i + 1) * anglePerTooth - (centerAngle - leftProfile[0].theta); 
+              if (Math.abs(tbe - tbs) < 1e-4) tbe = tbs + 1e-4; 
+              
+              for (let a = 0; a <= arcSteps; a++) {
+                  const theta = tbs + (tbe - tbs) * (a / arcSteps);
+                  botPts.push({ x: rBot * Math.cos(theta), y: rBot * Math.sin(theta) });
+              }
+              if (epsilon > 0) botPts = simplifyRDP(botPts, epsilon);
+
+              segments.push(leftPts);
+              segments.push(topPts);
+              segments.push(rightPts);
+              segments.push(botPts);
+            }
+
+            for (let i = 0; i < segments.length - 1; i++) {
+                segments[i+1][0] = segments[i][segments[i].length - 1];
+            }
+            segments[0][0] = segments[segments.length - 1][segments[segments.length - 1].length - 1];
+
+            return segments;
+          }, [pressureAngle, clearance, backlash]);
+
+          const flattenSegments = (segments) => {
+              const flat = [];
+              segments.forEach(seg => { for(let i=0; i<seg.length-1; i++) flat.push(seg[i]); });
+              return flat;
+          };
+
+          // TIER 1 OpenSource: Simplified 3D generation without complex matrices
+          const buildBasic3DGeometry = useCallback((points, holeRadius, isInternal, pitchRad, tx, ty) => {
+            let vertices = [];
+            let faces = [];
+            const zHeights = [0, gearThickness];
+            const slices = 1;
+            const N = points.length;
+
+            let maxProfileR = 0;
+            let minProfileR = Infinity;
+            
+            const profile2D = points.map(p => {
+                const pr = Math.hypot(p.x, p.y);
+                const ptAngle = Math.atan2(p.y, p.x);
+                if (pr > maxProfileR) maxProfileR = pr;
+                if (pr < minProfileR) minProfileR = pr;
+                return { x: p.x, y: p.y, r: pr, angle: ptAngle };
+            });
+
+            for (let s = 0; s <= slices; s++) {
+                const z = zHeights[s];
+                
+                let currentOuterLimit, currentInnerLimit;
+                if (isInternal) {
+                    currentOuterLimit = pitchRad + ringThickness;
+                    currentInnerLimit = minProfileR;
+                } else {
+                    currentInnerLimit = Math.max(0.01, holeRadius);
+                    currentOuterLimit = maxProfileR;
+                }
+
+                const zOffset = z - gearThickness/2;
+
+                for(let i = 0; i < N; i++) {
+                    const pt = profile2D[i];
+                    let ix, iy;
+                    if (isInternal) {
+                        const R_clamped = Math.max(currentInnerLimit, Math.min(pt.r, currentOuterLimit));
+                        const scale = pt.r === 0 ? 1 : R_clamped / pt.r;
+                        ix = pt.x * scale; iy = pt.y * scale;
+                    } else {
+                        ix = currentInnerLimit * Math.cos(pt.angle);
+                        iy = currentInnerLimit * Math.sin(pt.angle);
+                    }
+                    vertices.push({x: ix + tx, y: iy + ty, z: zOffset});
+                }
+
+                for(let i = 0; i < N; i++) {
+                    const pt = profile2D[i];
+                    let ox, oy;
+                    if (isInternal) {
+                        ox = currentOuterLimit * Math.cos(pt.angle);
+                        oy = currentOuterLimit * Math.sin(pt.angle);
+                    } else {
+                        const maxR_safe = Math.max(currentOuterLimit, currentInnerLimit);
+                        const R_clamped = Math.max(currentInnerLimit, Math.min(pt.r, maxR_safe));
+                        const scale = pt.r === 0 ? 1 : R_clamped / pt.r;
+                        ox = pt.x * scale; oy = pt.y * scale;
+                    }
+                    vertices.push({x: ox + tx, y: oy + ty, z: zOffset});
+                }
+            }
+
+            const pushTriQuad = (a, b, c, d) => {
+                faces.push([a, b, c]);
+                faces.push([a, c, d]);
+            };
+
+            const botIn = 0; const botOut = N;
+            for (let i = 0; i < N; i++) {
+                const next_i = (i + 1) % N;
+                pushTriQuad(botIn + i, botIn + next_i, botOut + next_i, botOut + i);
+            }
+
+            const topIn = 2 * N; const topOut = 2 * N + N;
+            for (let i = 0; i < N; i++) {
+                const next_i = (i + 1) % N;
+                pushTriQuad(topIn + i, topOut + i, topOut + next_i, topIn + next_i);
+            }
+
+            const currIn = 0; const currOut = N;
+            const nextIn = 2 * N; const nextOut = 2 * N + N;
+            for (let i = 0; i < N; i++) {
+                const next_i = (i + 1) % N;
+                pushTriQuad(currIn + i, nextIn + i, nextIn + next_i, currIn + next_i);
+                pushTriQuad(currOut + i, currOut + next_i, nextOut + next_i, nextOut + i);
+            }
+            
+            return { vertices, faces };
+          }, [gearThickness, ringThickness]);
+
+          const createThreeBufferGeometry = useCallback((geomData) => {
+              const { vertices, faces } = geomData;
+              const geometry = new THREE.BufferGeometry();
+              const posArray = [];
+              faces.forEach(f => {
+                  const v0 = vertices[f[0]]; const v1 = vertices[f[1]]; const v2 = vertices[f[2]];
+                  posArray.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
+              });
+              geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posArray), 3));
+              geometry.computeVertexNormals();
+              return geometry;
+          }, []);
+
+          const updateProjection = useCallback((w, h) => {
+              if (cameraRef.current) {
+                  cameraRef.current.aspect = w / h;
+                  if (panOffset.current.x !== 0 || panOffset.current.y !== 0) {
+                      cameraRef.current.setViewOffset(w, h, panOffset.current.x, panOffset.current.y, w, h);
+                  } else {
+                      cameraRef.current.clearViewOffset();
+                  }
+                  cameraRef.current.updateProjectionMatrix();
+              }
+          }, []);
+
+          const adjustCameraDistance = useCallback(() => {
+              if (!cameraRef.current || !controlsRef.current) return;
+              
+              const outerRad = r_r + ringThickness + (moduleSize * 2);
+              const aspect = cameraRef.current.aspect;
+              const fovRad = cameraRef.current.fov * (Math.PI / 180);
+              
+              const hFovRad = 2 * Math.atan(Math.tan(fovRad / 2) * aspect);
+              const minFov = Math.min(fovRad, hFovRad);
+              
+              const targetDistance = outerRad / Math.sin(minFov / 2);
+              
+              const currentPos = cameraRef.current.position.clone();
+              const target = controlsRef.current.target.clone();
+              const direction = currentPos.sub(target).normalize();
+              
+              if (direction.lengthSq() < 0.01) {
+                  direction.set(0, -1, 1).normalize();
+              }
+              
+              const newPos = target.add(direction.multiplyScalar(targetDistance));
+              cameraRef.current.position.copy(newPos);
+              controlsRef.current.update();
+              renderRequestRef.current = true;
+          }, [r_r, ringThickness, moduleSize]);
+
+          const resetCamera = useCallback(() => {
+              if (cameraRef.current && controlsRef.current && mountRef.current) {
+                  const outerRad = r_r + ringThickness + (moduleSize * 2);
+                  const aspect = cameraRef.current.aspect;
+                  const fovRad = cameraRef.current.fov * (Math.PI / 180);
+                  
+                  const hFovRad = 2 * Math.atan(Math.tan(fovRad / 2) * aspect);
+                  const minFov = Math.min(fovRad, hFovRad);
+                  
+                  const distance = outerRad / Math.sin(minFov / 2);
+                  const offset = distance / Math.sqrt(2); 
+
+                  cameraRef.current.position.set(0, -offset, offset);
+                  controlsRef.current.target.set(0, 0, 0); 
+                  controlsRef.current.update();
+
+                  panOffset.current.x = 0;
+                  panOffset.current.y = 0;
+                  const w = mountRef.current.clientWidth;
+                  const h = mountRef.current.clientHeight;
+                  updateProjection(w, h);
+                  
+                  renderRequestRef.current = true;
+              }
+          }, [r_r, ringThickness, moduleSize, updateProjection]);
+
+          // --- Initialize ThreeJS Environment ---
+          useEffect(() => {
+              const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+              renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+              mountRef.current.appendChild(renderer.domElement);
+              rendererRef.current = renderer;
+
+              const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
+              camera.up.set(0, 0, 1); 
+              cameraRef.current = camera;
+
+              const controls = new THREE.OrbitControls(camera, renderer.domElement);
+              controls.enableDamping = true;
+              controls.dampingFactor = 0.05;
+              controls.enablePan = false; 
+              controls.addEventListener('change', () => { renderRequestRef.current = true; });
+              controlsRef.current = controls;
+
+              // --- CUSTOM 2D PANNING ---
+              const dom = renderer.domElement;
+              let isPanning = false;
+              let lastMouse = { x: 0, y: 0 };
+              
+              const onPointerDown = (e) => {
+                  if (e.button === 2) { 
+                      e.preventDefault();
+                      isPanning = true;
+                      lastMouse.x = e.clientX;
+                      lastMouse.y = e.clientY;
+                      dom.setPointerCapture(e.pointerId);
+                  }
+              };
+              
+              const onPointerMove = (e) => {
+                  if (isPanning && mountRef.current) {
+                      e.preventDefault();
+                      const dx = e.clientX - lastMouse.x;
+                      const dy = e.clientY - lastMouse.y;
+                      lastMouse.x = e.clientX;
+                      lastMouse.y = e.clientY;
+                      
+                      panOffset.current.x -= dx;
+                      panOffset.current.y -= dy;
+                      
+                      const w = mountRef.current.clientWidth;
+                      const h = mountRef.current.clientHeight;
+                      updateProjection(w, h);
+                      renderRequestRef.current = true;
+                  }
+              };
+              
+              const onPointerUp = (e) => { 
+                  if (e.button === 2 && isPanning) {
+                      e.preventDefault();
+                      isPanning = false; 
+                      dom.releasePointerCapture(e.pointerId);
+                  }
+              };
+              
+              const onContextMenu = (e) => e.preventDefault();
+
+              dom.addEventListener('pointerdown', onPointerDown);
+              dom.addEventListener('pointermove', onPointerMove);
+              dom.addEventListener('pointerup', onPointerUp);
+              dom.addEventListener('contextmenu', onContextMenu);
+
+              const scene = sceneRef.current;
+              
+              const oldLights = scene.children.filter(c => c.isLight);
+              oldLights.forEach(l => scene.remove(l));
+
+              const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+              scene.add(ambientLight);
+
+              const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+              dirLight.position.set(100, -100, 200);
+              scene.add(dirLight);
+              
+              const dirLight2 = new THREE.DirectionalLight(0x90b0d0, 0.4);
+              dirLight2.position.set(-100, 100, -100);
+              scene.add(dirLight2);
+
+              const resizeObserver = new ResizeObserver((entries) => {
+                  if (!mountRef.current || !rendererRef.current || !cameraRef.current) return;
+                  const { width, height } = entries[0].contentRect;
+                  rendererRef.current.setSize(width, height, false);
+                  updateProjection(width, height);
+                  
+                  if (!initializedCamera.current) {
+                      resetCamera();
+                      initializedCamera.current = true;
+                  }
+                  renderRequestRef.current = true;
+              });
+              
+              resizeObserver.observe(mountRef.current);
+
+              return () => {
+                  resizeObserver.disconnect();
+                  dom.removeEventListener('pointerdown', onPointerDown);
+                  dom.removeEventListener('pointermove', onPointerMove);
+                  window.removeEventListener('pointerup', onPointerUp);
+                  dom.removeEventListener('contextmenu', onContextMenu);
+
+                  if (mountRef.current && rendererRef.current) {
+                      mountRef.current.removeChild(rendererRef.current.domElement);
+                  }
+                  if (rendererRef.current) rendererRef.current.dispose();
+              };
+          }, [resetCamera, updateProjection]);
+
+          // --- Rebuild 3D Meshes on param change ---
+          useEffect(() => {
+              const scene = sceneRef.current;
+              
+              Object.values(meshesRef.current).forEach(mesh => {
+                  if (!mesh) return;
+                  if (Array.isArray(mesh)) {
+                      mesh.forEach(m => { if (m) { scene.remove(m); disposeNode(m); } });
+                  } else {
+                      scene.remove(mesh); disposeNode(mesh);
+                  }
+              });
+              meshesRef.current = {};
+
+              const pIsEven = planetTeeth % 2 === 0;
+              const phi_p = pIsEven ? Math.PI / planetTeeth : 0;
+              const phi_r = pIsEven ? Math.PI / ringTeeth : 0;
+
+              const mats = materialsRef.current;
+
+              const sunPts = flattenSegments(generateGearSegments(sunTeeth, r_s, moduleSize, false, sunShift, true));
+              const sunGeom = createThreeBufferGeometry(buildBasic3DGeometry(sunPts, Math.max(0.01, safeSunHole / 2), false, r_s, 0, 0));
+              const sunMesh = new THREE.Mesh(sunGeom, mats.sun);
+              scene.add(sunMesh);
+              meshesRef.current.sun = sunMesh;
+
+              const ringPts = flattenSegments(generateGearSegments(ringTeeth, r_r, moduleSize, true, ringShift, true));
+              const ringGeom = createThreeBufferGeometry(buildBasic3DGeometry(ringPts, r_r + ringThickness, true, r_r, 0, 0));
+              const ringMesh = new THREE.Mesh(ringGeom, mats.ring);
+              scene.add(ringMesh);
+              meshesRef.current.ring = ringMesh;
+
+              meshesRef.current.planets = [];
+              const planetPts = flattenSegments(generateGearSegments(planetTeeth, r_p, moduleSize, false, planetShift, true));
+              const basePlanetGeom = createThreeBufferGeometry(buildBasic3DGeometry(planetPts, Math.max(0.01, safePlanetHole / 2), false, r_p, 0, 0));
+
+              for(let i=0; i<numPlanets; i++) {
+                  const alpha_i = i * 2 * Math.PI / numPlanets;
+                  const theta_pi = alpha_i + (0 - alpha_i) * (-sunTeeth / planetTeeth) + phi_p;
+                  const px = r_c * Math.cos(alpha_i);
+                  const py = r_c * Math.sin(alpha_i);
+
+                  const pMesh = new THREE.Mesh(basePlanetGeom, mats.planets[i % mats.planets.length]);
+                  pMesh.position.set(px, py, 0);
+                  pMesh.rotation.z = theta_pi;
+                  
+                  scene.add(pMesh);
+                  meshesRef.current.planets.push(pMesh);
+              }
+
+              if (showCarrier) {
+                  const cGroup = new THREE.Group();
+                  const cGeom = new THREE.CylinderGeometry(r_c + moduleSize, r_c + moduleSize, 2, 64);
+                  const cMesh = new THREE.Mesh(cGeom, mats.carrier);
+                  cMesh.rotation.x = Math.PI / 2;
+                  cGroup.add(cMesh);
+                  scene.add(cGroup);
+                  meshesRef.current.carrier = cGroup;
+              }
+
+              adjustCameraDistance();
+              renderRequestRef.current = true; 
+          }, [sunTeeth, planetTeeth, numPlanets, moduleSize, r_s, r_p, r_r, r_c, createThreeBufferGeometry, generateGearSegments, flattenSegments, buildBasic3DGeometry, showCarrier, safeSunHole, safePlanetHole, ringThickness, adjustCameraDistance, sunShift, planetShift, ringShift]);
+
+          useEffect(() => {
+            let frameId;
+            const animate = () => {
+                frameId = requestAnimationFrame(animate);
+                
+                if (isPlayingRef.current) {
+                    timeRef.current += 1;
+                    renderRequestRef.current = true;
+                }
+                
+                if (controlsRef.current) controlsRef.current.update();
+
+                if (renderRequestRef.current) {
+                    const { w_s, w_c, w_r } = calculateSpeedsRef.current();
+                    const t = timeRef.current;
+                    const theta_s = w_s * t;
+                    const theta_c = w_c * t;
+                    const theta_r = w_r * t;
+
+                    const pIsEven = planetTeeth % 2 === 0;
+                    const phi_p = pIsEven ? Math.PI / planetTeeth : 0;
+                    const phi_r = pIsEven ? Math.PI / ringTeeth : 0; 
+
+                    const meshes = meshesRef.current;
+
+                    if (meshes.sun) meshes.sun.rotation.z = theta_s;
+                    if (meshes.ring) meshes.ring.rotation.z = theta_r + phi_r; 
+                    if (meshes.carrier) meshes.carrier.rotation.z = theta_c;
+                    
+                    if (meshes.planets) {
+                        meshes.planets.forEach((pMesh, i) => {
+                            if (!pMesh) return;
+                            const alpha_i = theta_c + i * 2 * Math.PI / numPlanets;
+                            const theta_pi = alpha_i + (theta_s - alpha_i) * (-sunTeeth / planetTeeth) + phi_p;
+                            pMesh.position.x = r_c * Math.cos(alpha_i);
+                            pMesh.position.y = r_c * Math.sin(alpha_i);
+                            pMesh.rotation.z = theta_pi;
+                        });
+                    }
+
+                    if (rendererRef.current && sceneRef.current && cameraRef.current) {
+                        rendererRef.current.render(sceneRef.current, cameraRef.current);
+                    }
+                    
+                    if (!isPlayingRef.current) renderRequestRef.current = false;
+                }
+            };
+            animate();
+            return () => cancelAnimationFrame(frameId);
+          }, [sunTeeth, planetTeeth, ringTeeth, numPlanets, r_c]);
+
+          // TIER 1 FEATURE: SVG Export
+          const downloadSVG = () => {
+            const pIsEven = planetTeeth % 2 === 0;
+            const phi_p = pIsEven ? Math.PI / planetTeeth : 0;
+            const phi_r = pIsEven ? Math.PI / ringTeeth : 0;
+
+            const svgSize = (r_r + ringThickness) * 2 + 20;
+            const center = svgSize / 2;
+
+            let svgData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize}" height="${svgSize}">
+              <g transform="translate(${center}, ${center})">`;
+
+            const ringPts = flattenSegments(generateGearSegments(ringTeeth, r_r, moduleSize, true, ringShift, false, 'High'));
+            const rPath = ringPts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + " Z";
+            const bRadius = r_r + ringThickness;
+            const rHole = ` M ${bRadius} 0 A ${bRadius} ${bRadius} 0 1 0 -${bRadius} 0 A ${bRadius} ${bRadius} 0 1 0 ${bRadius} 0`;
+            
+            svgData += `<g transform="rotate(${(phi_r * 180 / Math.PI)})">
+              <path d="${rPath + rHole}" fill="none" stroke="#EF4444" stroke-width="1.5" fill-rule="evenodd" />
+            </g>`;
+
+            for (let i = 0; i < numPlanets; i++) {
+              const alpha_i = i * 2 * Math.PI / numPlanets;
+              const theta_pi = alpha_i + (0 - alpha_i) * (-sunTeeth / planetTeeth) + phi_p;
+              const px = r_c * Math.cos(alpha_i);
+              const py = r_c * Math.sin(alpha_i);
+              
+              const pPts = flattenSegments(generateGearSegments(planetTeeth, r_p, moduleSize, false, planetShift, false, 'High'));
+              const pPath = pPts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + " Z";
+
+              svgData += `<g transform="translate(${px}, ${py}) rotate(${(theta_pi * 180 / Math.PI)})">
+                <path d="${pPath}" fill="none" stroke="#3B82F6" stroke-width="1.5" fill-rule="evenodd" />
+                <circle cx="0" cy="0" r="${Math.max(0.01, safePlanetHole / 2)}" fill="#000" />
+              </g>`;
+            }
+
+            const sPts = flattenSegments(generateGearSegments(sunTeeth, r_s, moduleSize, false, sunShift, false, 'High'));
+            const sPath = sPts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + " Z";
+            svgData += `<g><path d="${sPath}" fill="none" stroke="#F59E0B" stroke-width="1.5" fill-rule="evenodd" /><circle cx="0" cy="0" r="${Math.max(0.01, safeSunHole / 2)}" fill="#000" /></g>`;
+
+            if (showCarrier) {
+              for (let i = 0; i < numPlanets; i++) {
+                const alpha_i = i * 2 * Math.PI / numPlanets;
+                const px = r_c * Math.cos(alpha_i);
+                const py = r_c * Math.sin(alpha_i);
+                svgData += `<line x1="0" y1="0" x2="${px}" y2="${py}" stroke="${CARRIER_COLOR}" stroke-width="${moduleSize}" opacity="0.4" stroke-linecap="round"/>`;
+              }
+            }
+
+            svgData += `</g></svg>`;
+
+            const blob = new Blob([svgData], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `planetary-gear-S${sunTeeth}-P${planetTeeth}.svg`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+
+          // TIER 1 FEATURE: 2D DXF Export (ASCII DXF R12)
+          const downloadDXF = () => {
+              const pIsEven = planetTeeth % 2 === 0;
+              const phi_p = pIsEven ? Math.PI / planetTeeth : 0;
+              const phi_r = pIsEven ? Math.PI / ringTeeth : 0;
+
+              let dxf = "0\nSECTION\n2\nENTITIES\n";
+
+              const addLine = (x1, y1, x2, y2, layer) => {
+                  dxf += `0\nLINE\n8\n${layer}\n10\n${x1.toFixed(4)}\n20\n${y1.toFixed(4)}\n11\n${x2.toFixed(4)}\n21\n${y2.toFixed(4)}\n`;
+              };
+              const addCircle = (cx, cy, r, layer) => {
+                  dxf += `0\nCIRCLE\n8\n${layer}\n10\n${cx.toFixed(4)}\n20\n${cy.toFixed(4)}\n40\n${r.toFixed(4)}\n`;
+              };
+
+              // Ring Gear (Rotated)
+              const ringPts = flattenSegments(generateGearSegments(ringTeeth, r_r, moduleSize, true, ringShift, false, 'High'));
+              const ringCasingR = r_r + ringThickness;
+              for(let i=0; i<ringPts.length-1; i++) {
+                  const x1 = ringPts[i].x * Math.cos(phi_r) - ringPts[i].y * Math.sin(phi_r);
+                  const y1 = ringPts[i].x * Math.sin(phi_r) + ringPts[i].y * Math.cos(phi_r);
+                  const x2 = ringPts[i+1].x * Math.cos(phi_r) - ringPts[i+1].y * Math.sin(phi_r);
+                  const y2 = ringPts[i+1].x * Math.sin(phi_r) + ringPts[i+1].y * Math.cos(phi_r);
+                  addLine(x1, y1, x2, y2, 'RingGear');
+              }
+              const xL = ringPts[ringPts.length-1].x * Math.cos(phi_r) - ringPts[ringPts.length-1].y * Math.sin(phi_r);
+              const yL = ringPts[ringPts.length-1].x * Math.sin(phi_r) + ringPts[ringPts.length-1].y * Math.cos(phi_r);
+              const xF = ringPts[0].x * Math.cos(phi_r) - ringPts[0].y * Math.sin(phi_r);
+              const yF = ringPts[0].x * Math.sin(phi_r) + ringPts[0].y * Math.cos(phi_r);
+              addLine(xL, yL, xF, yF, 'RingGear');
+              addCircle(0, 0, ringCasingR, 'RingCasing');
+
+              // Sun Gear
+              const sunPts = flattenSegments(generateGearSegments(sunTeeth, r_s, moduleSize, false, sunShift, false, 'High'));
+              for(let i=0; i<sunPts.length-1; i++) addLine(sunPts[i].x, sunPts[i].y, sunPts[i+1].x, sunPts[i+1].y, 'SunGear');
+              addLine(sunPts[sunPts.length-1].x, sunPts[sunPts.length-1].y, sunPts[0].x, sunPts[0].y, 'SunGear');
+              if(safeSunHole > 0) addCircle(0, 0, safeSunHole/2, 'SunHole');
+
+              // Planet Gears
+              for (let i = 0; i < numPlanets; i++) {
+                  const alpha_i = i * 2 * Math.PI / numPlanets;
+                  const theta_pi = alpha_i + (0 - alpha_i) * (-sunTeeth / planetTeeth) + phi_p;
+                  const px = r_c * Math.cos(alpha_i);
+                  const py = r_c * Math.sin(alpha_i);
+                  
+                  const pPts = flattenSegments(generateGearSegments(planetTeeth, r_p, moduleSize, false, planetShift, false, 'High'));
+                  for(let j=0; j<pPts.length-1; j++) {
+                      const x1 = pPts[j].x * Math.cos(theta_pi) - pPts[j].y * Math.sin(theta_pi) + px;
+                      const y1 = pPts[j].x * Math.sin(theta_pi) + pPts[j].y * Math.cos(theta_pi) + py;
+                      const x2 = pPts[j+1].x * Math.cos(theta_pi) - pPts[j+1].y * Math.sin(theta_pi) + px;
+                      const y2 = pPts[j+1].x * Math.sin(theta_pi) + pPts[j+1].y * Math.cos(theta_pi) + py;
+                      addLine(x1, y1, x2, y2, `PlanetGear_${i+1}`);
+                  }
+                  const pxL = pPts[pPts.length-1].x * Math.cos(theta_pi) - pPts[pPts.length-1].y * Math.sin(theta_pi) + px;
+                  const pyL = pPts[pPts.length-1].x * Math.sin(theta_pi) + pPts[pPts.length-1].y * Math.cos(theta_pi) + py;
+                  const pxF = pPts[0].x * Math.cos(theta_pi) - pPts[0].y * Math.sin(theta_pi) + px;
+                  const pyF = pPts[0].x * Math.sin(theta_pi) + pPts[0].y * Math.cos(theta_pi) + py;
+                  addLine(pxL, pyL, pxF, pyF, `PlanetGear_${i+1}`);
+
+                  if(safePlanetHole > 0) addCircle(px, py, safePlanetHole/2, `PlanetHole_${i+1}`);
+              }
+
+              dxf += "0\nENDSEC\n0\nEOF\n";
+
+              const blob = new Blob([dxf], { type: 'application/dxf' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `planetary-gear-2D-S${sunTeeth}-P${planetTeeth}.dxf`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+          };
+
+          return (
+            <div className="relative w-full h-[100dvh] bg-[#0b0f19] text-slate-200 font-sans overflow-hidden">
+              
+              {/* CANVAS CONTAINER */}
+              <div ref={mountRef} className="absolute inset-0 z-0 outline-none" style={{ touchAction: 'none' }} />
+
+              {/* FLOATING TOP TOGGLES */}
+              <div className={`absolute top-4 left-4 z-10 transition-opacity duration-300 ${leftOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                  <button onClick={() => setLeftOpen(true)} className="flex items-center gap-2 p-3 bg-slate-900/80 hover:bg-slate-800 backdrop-blur text-white rounded-lg shadow-lg border border-slate-700 transition-colors">
+                      <Settings className="w-5 h-5 text-emerald-400" />
+                      <span className="text-sm font-bold tracking-wider hidden sm:inline">CONTROLS</span>
+                  </button>
+              </div>
+
+              <div className={`absolute top-4 right-4 z-10 transition-opacity duration-300 ${rightOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                  <button onClick={() => setRightOpen(true)} className="flex items-center gap-2 p-3 bg-slate-900/80 hover:bg-slate-800 backdrop-blur text-white rounded-lg shadow-lg border border-slate-700 transition-colors">
+                      <span className="text-sm font-bold tracking-wider hidden sm:inline">SPECS & UPGRADES</span>
+                      <ListTree className="w-5 h-5 text-indigo-400" />
+                  </button>
+              </div>
+
+              {/* FLOATING TOP-CENTER BADGES */}
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-0 flex-col items-center gap-2 pointer-events-none hidden md:flex">
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 rounded-full backdrop-blur shadow-lg">
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span className="text-[11px] font-bold uppercase tracking-wider">OpenSource Community Edition</span>
+                  </div>
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/60 border border-slate-700 text-slate-300 rounded-full backdrop-blur shadow-lg">
+                      <MousePointer2 className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-bold uppercase tracking-wider">Drag to Rotate • Scroll to Zoom • Right-Click Pan</span>
+                  </div>
+              </div>
+
+              {/* FLOATING BOTTOM TOOLBAR */}
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex flex-col sm:flex-row items-center gap-3 w-full px-4 pointer-events-none justify-center">
+                  <div className="pointer-events-auto flex gap-2">
+                      <button onClick={() => setIsPlaying(!isPlaying)} className="flex items-center gap-2 px-4 py-3 bg-slate-900/90 hover:bg-slate-800 backdrop-blur text-white rounded-xl shadow-xl transition-colors border border-slate-700">
+                          {isPlaying ? <Pause className="w-5 h-5 text-amber-400" /> : <Play className="w-5 h-5 text-emerald-400" />}
+                          <span className="text-sm font-bold tracking-wider">{isPlaying ? 'PAUSE' : 'PLAY'}</span>
+                      </button>
+                      <button onClick={resetCamera} title="Recenter Camera" className="flex items-center gap-2 px-4 py-3 bg-slate-900/90 hover:bg-slate-800 backdrop-blur text-white rounded-xl shadow-xl transition-colors border border-slate-700">
+                          <Focus className="w-5 h-5 text-sky-400" />
+                      </button>
+                  </div>
+                  
+                  {/* TIER 1 - 2D ONLY EXPORTS */}
+                  <div className="pointer-events-auto flex bg-emerald-900/90 backdrop-blur rounded-xl shadow-xl divide-x divide-emerald-700/50 border border-emerald-500/50 overflow-hidden">
+                      <button onClick={downloadSVG} className="flex items-center gap-2 px-6 py-3 transition-colors hover:bg-emerald-700 text-white" title="Export 2D Vector (SVG)">
+                          <Download className="w-5 h-5" /><span className="text-sm font-bold tracking-widest hidden xl:inline">EXPORT SVG</span>
+                      </button>
+                      <button onClick={downloadDXF} className="flex items-center gap-2 px-6 py-3 transition-colors hover:bg-emerald-600 text-white bg-emerald-800" title="Export 2D CAD (DXF)">
+                          <PenTool className="w-5 h-5" /><span className="text-sm font-bold tracking-widest hidden xl:inline">EXPORT DXF</span>
+                      </button>
+                  </div>
+              </div>
+
+              {/* LEFT PANEL */}
+              <div className={`absolute top-0 left-0 bottom-0 w-[340px] max-w-[100vw] bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 flex flex-col z-30 transition-transform duration-300 shadow-2xl ${leftOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+                <div className="p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-3">
+                    <Settings className="text-emerald-400 w-6 h-6" />
+                    <h1 className="text-[17px] font-bold tracking-tight text-white italic">PLANETARY GEAR ENGINE</h1>
+                  </div>
+                  <button onClick={() => setLeftOpen(false)} className="p-1 text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-md">
+                      <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-4 flex-1 overflow-y-auto">
+                  <Panel title="⚙️ Kinematic Precision" defaultOpen={true}>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-sm text-slate-300 font-medium">Sun Teeth (S)</label>
+                          <NumberInput value={sunTeeth} onChange={setSunTeeth} validArray={validS} colorClass="text-amber-400" />
+                        </div>
+                        <input type="range" min="0" max={Math.max(0, validS.length - 1)} step="1" value={validS.indexOf(sunTeeth) !== -1 ? validS.indexOf(sunTeeth) : 0} onChange={(e) => setSunTeeth(validS[parseInt(e.target.value)])} disabled={validS.length <= 1} className={`w-full accent-amber-500 mt-2 ${validS.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-sm text-slate-300 font-medium">Planet Teeth (P)</label>
+                          <NumberInput value={planetTeeth} onChange={setPlanetTeeth} validArray={validP} colorClass="text-blue-400" />
+                        </div>
+                        <input type="range" min="0" max={Math.max(0, validP.length - 1)} step="1" value={validP.indexOf(planetTeeth) !== -1 ? validP.indexOf(planetTeeth) : 0} onChange={(e) => setPlanetTeeth(validP[parseInt(e.target.value)])} disabled={validP.length <= 1} className={`w-full accent-blue-500 mt-2 ${validP.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-sm text-slate-300 font-medium">Num Planets</label>
+                          <NumberInput value={numPlanets} onChange={setNumPlanets} validArray={validN} colorClass="text-emerald-400" />
+                        </div>
+                        <input type="range" min="0" max={Math.max(0, validN.length - 1)} step="1" value={validN.indexOf(numPlanets) !== -1 ? validN.indexOf(numPlanets) : 0} onChange={(e) => setNumPlanets(validN[parseInt(e.target.value)])} disabled={validN.length <= 1} className={`w-full accent-emerald-500 mt-2 ${validN.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-sm text-slate-300 font-medium">Module (Size)</label>
+                          <NumberInput value={moduleSize} onChange={setModuleSize} min={1} max={10} step={0.1} colorClass="text-purple-400" />
+                        </div>
+                        <input type="range" min="1" max="10" step="0.1" value={moduleSize} onChange={(e) => setModuleSize(parseFloat(e.target.value))} className="w-full accent-purple-500 mt-2" />
+                      </div>
+                  </Panel>
+
+                  <Panel title="🛠️ Profile Shift (x)" defaultOpen={false}>
+                      <div className="text-xs text-slate-500 mb-4 pb-2 border-b border-slate-800">
+                          Thickens/thins teeth to prevent undercutting on small gears and precisely controls center distance.
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-sm text-slate-300 font-medium">Sun Shift (xs)</label>
+                          <span className="text-sm font-mono text-sky-400">{sunShift.toFixed(2)}</span>
+                        </div>
+                        <input type="range" min="-0.5" max="1.0" step="0.01" value={sunShift} onChange={(e) => setSunShift(parseFloat(e.target.value))} className="w-full accent-sky-500" />
+                      </div>
+                      <div className="mt-4">
+                        <div className="flex justify-between mb-1">
+                          <label className="text-sm text-slate-300 font-medium">Planet Shift (xp)</label>
+                          <span className="text-sm font-mono text-sky-400">{planetShift.toFixed(2)}</span>
+                        </div>
+                        <input type="range" min="-0.5" max="1.0" step="0.01" value={planetShift} onChange={(e) => setPlanetShift(parseFloat(e.target.value))} className="w-full accent-sky-500" />
+                      </div>
+                  </Panel>
+
+                  <Panel title="📐 Dimensions & Holes" defaultOpen={true}>
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <div className="flex justify-between mb-1"><label className="text-xs text-slate-400">Thickness (Z)</label></div>
+                            <div className="flex flex-col gap-2"><NumberInput value={gearThickness} onChange={setGearThickness} min={5} max={50} widthClass="w-full" colorClass="text-indigo-300" /><input type="range" min="5" max="50" step="1" value={gearThickness} onChange={(e) => setGearThickness(parseInt(e.target.value))} className="w-full accent-indigo-400" /></div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between mb-1"><label className="text-xs text-slate-400">Ring Wall</label></div>
+                            <div className="flex flex-col gap-2"><NumberInput value={ringThickness} onChange={setRingThickness} min={5} max={50} widthClass="w-full" colorClass="text-indigo-300" /><input type="range" min="5" max="50" step="1" value={ringThickness} onChange={(e) => setRingThickness(parseInt(e.target.value))} className="w-full accent-indigo-400" /></div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between mb-1"><label className="text-xs text-slate-400">Sun Hole</label></div>
+                            <div className="flex flex-col gap-2"><NumberInput value={sunHole} onChange={setSunHole} min={0} max={50} step={0.5} widthClass="w-full" colorClass="text-amber-500" /><input type="range" min="0" max="50" step="0.5" value={sunHole} onChange={(e) => setSunHole(parseFloat(e.target.value))} className="w-full accent-amber-500" /></div>
+                          </div>
+                          <div>
+                            <div className="flex justify-between mb-1"><label className="text-xs text-slate-400">Planet Hole</label></div>
+                            <div className="flex flex-col gap-2"><NumberInput value={planetHole} onChange={setPlanetHole} min={0} max={50} step={0.5} widthClass="w-full" colorClass="text-blue-500" /><input type="range" min="0" max="50" step="0.5" value={planetHole} onChange={(e) => setPlanetHole(parseFloat(e.target.value))} className="w-full accent-blue-500" /></div>
+                          </div>
+                      </div>
+                  </Panel>
+
+                  <Panel title="🔬 Advanced Gear Profiling" defaultOpen={false}>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-sm text-slate-300 font-medium">Pressure Angle</label>
+                          <span className="text-sm font-mono text-slate-400">{pressureAngle}°</span>
+                        </div>
+                        <input type="range" min="14.5" max="30" step="0.5" value={pressureAngle} onChange={(e) => setPressureAngle(parseFloat(e.target.value))} className="w-full accent-slate-400" />
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-sm text-slate-300 font-medium">Clearance Coeff.</label>
+                          <span className="text-sm font-mono text-slate-400">{clearance.toFixed(2)}</span>
+                        </div>
+                        <input type="range" min="0.1" max="0.5" step="0.05" value={clearance} onChange={(e) => setClearance(parseFloat(e.target.value))} className="w-full accent-slate-400" />
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <label className="text-sm text-slate-300 font-medium">Backlash (Tol.)</label>
+                          <span className="text-sm font-mono text-slate-400">{backlash.toFixed(2)} mm</span>
+                        </div>
+                        <input type="range" min="0" max="1" step="0.05" value={backlash} onChange={(e) => setBacklash(parseFloat(e.target.value))} className="w-full accent-slate-400" />
+                      </div>
+                  </Panel>
+
+                  <Panel title="🎬 Environment Controls" defaultOpen={false}>
+                      <div className="mb-4">
+                          <label className="text-xs text-slate-400 font-medium block mb-2 uppercase tracking-wider">Fixed Kinematic Part</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {['ring', 'sun', 'carrier'].map(part => (
+                              <button
+                                key={part}
+                                onClick={() => setFixedPart(part)}
+                                className={`py-1.5 text-[11px] font-bold rounded uppercase tracking-wider transition-colors
+                                  ${fixedPart === part 
+                                    ? 'bg-slate-600 text-white' 
+                                    : 'bg-slate-950 text-slate-500 hover:bg-slate-800 border border-slate-800'}`}
+                              >
+                                {part}
+                              </button>
+                            ))}
+                          </div>
+                      </div>
+                      <div className="mb-4">
+                         <div className="flex justify-between mb-1">
+                            <label className="text-xs text-slate-400 font-medium uppercase tracking-wider">Input Speed</label>
+                          </div>
+                          <input 
+                            type="range" min="-100" max="100" step="1" 
+                            value={speed} 
+                            onChange={(e) => setSpeed(parseInt(e.target.value))}
+                            className="w-full accent-slate-400" 
+                          />
+                      </div>
+                      <div className="pt-2 border-t border-slate-800 space-y-3">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={showCarrier}
+                              onChange={(e) => setShowCarrier(e.target.checked)}
+                              className="rounded bg-slate-900 border-slate-700 accent-emerald-500"
+                            />
+                            <span className="text-sm text-slate-300">Show Carrier Frame</span>
+                          </label>
+                      </div>
+                  </Panel>
+                  
+                  <Panel title="💾 Save & Load Profile" defaultOpen={false}>
+                      <div className="flex gap-2">
+                          <button onClick={exportSettings} className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 py-2 rounded text-xs font-bold text-slate-300 transition-colors">
+                              <Download className="w-3.5 h-3.5" /> Export JSON
+                          </button>
+                          <label className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 py-2 rounded text-xs font-bold text-slate-300 text-center cursor-pointer transition-colors">
+                              <Save className="w-3.5 h-3.5" /> Import JSON
+                              <input type="file" accept=".json" className="hidden" onChange={importSettings} />
+                          </label>
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-2 pb-2 border-b border-slate-800 text-center">Settings are continually auto-saved to your browser.</div>
+                      <button onClick={resetDefaults} className="w-full mt-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/50 py-2 rounded text-xs font-bold text-red-400 transition-colors">
+                          Reset All to Defaults
+                      </button>
+                  </Panel>
+
+                </div>
+              </div>
+
+              {/* RIGHT PANEL - FUNNEL & SPECS */}
+              <div className={`absolute top-0 right-0 bottom-0 w-[340px] max-w-[100vw] bg-slate-900/95 backdrop-blur-xl border-l border-slate-800 flex flex-col z-30 transition-transform duration-300 shadow-2xl ${rightOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                <div className="p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
+                  <h2 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                    System Specifications
+                  </h2>
+                  <button onClick={() => setRightOpen(false)} className="p-1 text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-md">
+                      <XIcon className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-4 overflow-y-auto">
+                  {/* Highlighted Critical Stats */}
+                  <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 shadow-inner space-y-3">
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+                      <span className="text-slate-400 text-sm font-medium">True Center Distance</span>
+                      <span className="font-mono text-emerald-400 font-bold text-lg">{r_c.toFixed(3)} <span className="text-xs text-slate-500">mm</span></span>
+                    </div>
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+                      <span className="text-slate-400 text-sm font-medium">Working PA (αw)</span>
+                      <span className="font-mono font-bold text-sky-400 text-lg">{(alphaW * 180 / Math.PI).toFixed(2)}°</span>
+                    </div>
+                    <div className="flex justify-between items-center pb-3 border-b border-slate-800">
+                      <span className="text-red-400 text-sm font-medium">Ring Teeth (R)</span>
+                      <span className="font-mono font-bold text-white text-lg">{ringTeeth}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-400 text-sm font-medium">Gear Ratio</span>
+                      <span className="font-mono text-amber-400 font-semibold text-lg">{gearRatioText()}</span>
+                    </div>
+                  </div>
+
+                  {/* Detailed System Geometry Accordions */}
+                  <Panel title="System Geometry" defaultOpen={false}>
+                      <StatRow label="Module (Size)" value={moduleSize.toFixed(2)} symbol="m" />
+                      <StatRow label="Pressure Angle" value={`${pressureAngle}°`} symbol="α" />
+                      <StatRow label="Circular Pitch" value={(Math.PI * moduleSize).toFixed(3)} symbol="p" />
+                      <StatRow label="Base Pitch" value={(Math.PI * moduleSize * Math.cos(pressureAngle * Math.PI / 180)).toFixed(3)} symbol="pb" />
+                      <StatRow label="Clearance" value={(clearance * moduleSize).toFixed(3)} symbol="c" />
+                  </Panel>
+
+                  <Panel title="Sun Gear (Center)" defaultOpen={false}>
+                      <StatRow label="Teeth" value={sunTeeth} symbol="z" />
+                      <StatRow label="Profile Shift" value={sunShift.toFixed(2)} symbol="x" />
+                      <StatRow label="Pitch Dia." value={(sunTeeth * moduleSize).toFixed(3)} symbol="d" />
+                      <StatRow label="Base Dia." value={(sunTeeth * moduleSize * Math.cos(pressureAngle * Math.PI / 180)).toFixed(3)} symbol="db" />
+                      <StatRow label="Outer Dia." value={((sunTeeth + 2 + 2*sunShift) * moduleSize).toFixed(3)} symbol="da" />
+                      <StatRow label="Root Dia." value={(sunTeeth * moduleSize - 2 * (1 + clearance - sunShift) * moduleSize).toFixed(3)} symbol="df" />
+                  </Panel>
+
+                  <Panel title="Planet Gears (Orbiters)" defaultOpen={false}>
+                      <StatRow label="Teeth" value={planetTeeth} symbol="z" />
+                      <StatRow label="Profile Shift" value={planetShift.toFixed(2)} symbol="x" />
+                      <StatRow label="Pitch Dia." value={(planetTeeth * moduleSize).toFixed(3)} symbol="d" />
+                      <StatRow label="Base Dia." value={(planetTeeth * moduleSize * Math.cos(pressureAngle * Math.PI / 180)).toFixed(3)} symbol="db" />
+                      <StatRow label="Outer Dia." value={((planetTeeth + 2 + 2*planetShift) * moduleSize).toFixed(3)} symbol="da" />
+                      <StatRow label="Root Dia." value={(planetTeeth * moduleSize - 2 * (1 + clearance - planetShift) * moduleSize).toFixed(3)} symbol="df" />
+                  </Panel>
+
+                  <Panel title="Ring Gear (Outer)" defaultOpen={false}>
+                      <StatRow label="Teeth" value={ringTeeth} symbol="z" />
+                      <StatRow label="Pitch Dia." value={(ringTeeth * moduleSize).toFixed(3)} symbol="d" />
+                      <StatRow label="Base Dia." value={(ringTeeth * moduleSize * Math.cos(pressureAngle * Math.PI / 180)).toFixed(3)} symbol="db" />
+                      <StatRow label="Inner Dia. (Tip)" value={((ringTeeth - 2) * moduleSize).toFixed(3)} symbol="da" />
+                      <StatRow label="Root Dia." value={(ringTeeth * moduleSize + 2 * (1 + clearance) * moduleSize).toFixed(3)} symbol="df" />
+                      <StatRow label="Outer Casing Dia." value={(ringTeeth * moduleSize + ringThickness * 2).toFixed(3)} />
+                  </Panel>
+
+                  {/* THE MONETIZATION FUNNEL */}
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mt-6 space-y-4">
+                      <div className="text-center pb-4 border-b border-slate-700">
+                          <h3 className="text-white font-bold mb-2">If you find this tool useful, please consider supporting the Dev 🙂</h3>
+                          <a href="https://buymeacoffee.com/shinjuku1" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center w-full gap-2 bg-[#FFDD00] hover:bg-[#FFDD00]/90 text-black font-bold py-2 px-4 rounded shadow transition-colors text-sm">
+                              ☕ Buy me a coffee
+                          </a>
+                      </div>
+                      <div className="space-y-3">
+                          <div className="bg-indigo-950/30 border border-indigo-500/30 p-3 rounded">
+                              <p className="text-indigo-300 font-bold text-xs uppercase mb-1">Tier 2: Maker Edition</p>
+                              <p className="text-slate-400 text-xs mb-2">Unlocks 3D Mesh (OBJ/STL), Helix Angles, & Bevels.</p>
+                              <a href="[INSERT_TIER_2_LINK_HERE]" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 text-xs font-bold flex items-center gap-1">Get Maker Tier $19.99 Lifetime<ChevronRight className="w-3 h-3"/></a>
+                          </div>
+                          <div className="bg-amber-950/30 border border-amber-500/30 p-3 rounded">
+                              <p className="text-amber-300 font-bold text-xs uppercase mb-1">Tier 3: Pro Edition</p>
+                              <p className="text-slate-400 text-xs mb-2">Unlocks Solid B-Rep STEP, QC (MOP), & Stress Analytics.</p>
+                              <a href="https://m87.lemonsqueezy.com/checkout/buy/63d6f42c-d4bf-4de5-b1c3-5c9cb39d05a1" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 text-xs font-bold flex items-center gap-1">Get Pro Tier $49.99 Lifetime<ChevronRight className="w-3 h-3"/></a>
+                          </div>
+                      </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
