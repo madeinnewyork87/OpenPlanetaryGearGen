@@ -24,7 +24,7 @@ This entire application is bundled into a single, dependency-free HTML file.
 
 If you need to 3D print your gears or integrate them into professional assemblies (SolidWorks, Fusion 360, Inventor), check out the upgraded tiers.
 
-### **🛠️ \[Tier 2: Maker Edition\](https://m87.lemonsqueezy.com/checkout/buy/25be5fef-a293-4d93-89ea-2c64810bb275) \- $19.99 Lifetime**
+### **🛠️ [Tier 2: Maker Edition\](https://m87.lemonsqueezy.com/checkout/buy/25be5fef-a293-4d93-89ea-2c64810bb275) \- $19.99 Lifetime**
 
 Built for 3D printing enthusiasts.
 
