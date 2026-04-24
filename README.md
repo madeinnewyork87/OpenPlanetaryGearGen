@@ -10,11 +10,11 @@ Try the tool right now: https://madeinnewyork87.github.io/OpenPlanetaryGearGen/G
 
 OR
 
-This entire application is bundled into a single, dependency-free HTML file.
+This entire application is bundled into a single, HTML file.
 
 1. Download or clone this repository.  
 2. Double-click planetary\_gear\_free.html to open it in any modern web browser.  
-3. Start designing\! It runs 100% offline.
+3. Start designing
 
 ## **✨ Free Features (Tier 1\)**
 
