@@ -6,6 +6,10 @@ A mathematically precise, browser-based planetary gear generator. Visualize asse
 
 ## **🚀 Quick Start**
 
+Try the tool right now: https://madeinnewyork87.github.io/OpenPlanetaryGearGen/GearGen-T1.html
+
+OR
+
 This entire application is bundled into a single, dependency-free HTML file.
 
 1. Download or clone this repository.  
