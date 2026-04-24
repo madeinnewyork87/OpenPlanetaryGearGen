@@ -69,11 +69,12 @@
           cutting, CNC routing, and blueprinting.
           
           SUPPORT THE PROJECT:
-          ☕ Buy me a coffee: https://buymeacoffee.com/shinjuku1
+          If this tool saved you hours of work, the best way to support the
+          developer is to upgrade to the Maker or Pro tiers!
           
           NEED 3D EXPORTS & ANALYTICS?
           🛠️ Upgrade to Tier 2 (MAKER) for 3D Mesh (OBJ/STL) & Helix/Bevel features.
-             Link: https://m87.lemonsqueezy.com/checkout/buy/25be5fef-a293-4d93-89ea-2c64810bb275
+             Link: [INSERT TIER 2 LINK HERE]
           🚀 Upgrade to Tier 3 (PRO) for Solid B-Rep STEP, QC, & Stress Analytics.
              Link: https://m87.lemonsqueezy.com/checkout/buy/63d6f42c-d4bf-4de5-b1c3-5c9cb39d05a1
           ====================================================================
@@ -96,6 +97,7 @@
         const Save = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>);
         const XIcon = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>);
         const ShieldCheck = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>);
+        const Sparkles = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>);
 
         // --- Math Helpers ---
         const invAngle = (alpha) => Math.tan(alpha) - alpha;
@@ -1364,21 +1366,20 @@
                   {/* THE MONETIZATION FUNNEL */}
                   <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mt-6 space-y-4">
                       <div className="text-center pb-4 border-b border-slate-700">
-                          <h3 className="text-white font-bold mb-2">If you find this tool useful, please consider supporting the Dev 🙂</h3>
-                          <a href="https://buymeacoffee.com/shinjuku1" target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center w-full gap-2 bg-[#FFDD00] hover:bg-[#FFDD00]/90 text-black font-bold py-2 px-4 rounded shadow transition-colors text-sm">
-                              ☕ Buy me a coffee
-                          </a>
+                          <Sparkles className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+                          <h3 className="text-white font-bold mb-2">Support the Developer</h3>
+                          <p className="text-slate-400 text-xs leading-relaxed">If this free tool saved you hours of CAD sketching, the best way to support the project is to grab a lifetime upgrade!</p>
                       </div>
                       <div className="space-y-3">
-                          <div className="bg-indigo-950/30 border border-indigo-500/30 p-3 rounded">
+                          <div className="bg-indigo-950/30 border border-indigo-500/30 p-3 rounded hover:border-indigo-400 transition-colors group">
                               <p className="text-indigo-300 font-bold text-xs uppercase mb-1">Tier 2: Maker Edition</p>
                               <p className="text-slate-400 text-xs mb-2">Unlocks 3D Mesh (OBJ/STL), Helix Angles, & Bevels.</p>
-                              <a href="[INSERT_TIER_2_LINK_HERE]" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 text-xs font-bold flex items-center gap-1">Get Maker Tier $19.99 Lifetime<ChevronRight className="w-3 h-3"/></a>
+                              <a href="https://m87.lemonsqueezy.com/checkout/buy/25be5fef-a293-4d93-89ea-2c64810bb275" target="_blank" rel="noopener noreferrer" className="text-indigo-400 group-hover:text-indigo-300 text-xs font-bold flex items-center gap-1">Get Maker Tier $19.99 Lifetime<ChevronRight className="w-3 h-3"/></a>
                           </div>
-                          <div className="bg-amber-950/30 border border-amber-500/30 p-3 rounded">
+                          <div className="bg-amber-950/30 border border-amber-500/30 p-3 rounded hover:border-amber-400 transition-colors group">
                               <p className="text-amber-300 font-bold text-xs uppercase mb-1">Tier 3: Pro Edition</p>
                               <p className="text-slate-400 text-xs mb-2">Unlocks Solid B-Rep STEP, QC (MOP), & Stress Analytics.</p>
-                              <a href="https://m87.lemonsqueezy.com/checkout/buy/63d6f42c-d4bf-4de5-b1c3-5c9cb39d05a1" target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300 text-xs font-bold flex items-center gap-1">Get Pro Tier $49.99 Lifetime<ChevronRight className="w-3 h-3"/></a>
+                              <a href="https://m87.lemonsqueezy.com/checkout/buy/63d6f42c-d4bf-4de5-b1c3-5c9cb39d05a1" target="_blank" rel="noopener noreferrer" className="text-amber-400 group-hover:text-amber-300 text-xs font-bold flex items-center gap-1">Get Pro Tier $49.99 Lifetime<ChevronRight className="w-3 h-3"/></a>
                           </div>
                       </div>
                   </div>
