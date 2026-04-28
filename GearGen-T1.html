@@ -6,1392 +6,905 @@
     <title>Planetary Gear Suite | Tier 1 OpenSource</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚙️</text></svg>">
     
-    <!-- React & ReactDOM -->
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-    
-    <!-- Babel for in-browser JSX compilation -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <!-- Three.js & OrbitControls for Hardware Accelerated 3D Preview -->
+    <!-- Dependencies: Three.js & OrbitControls -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
     <style>
-        body { margin: 0; background-color: #0f172a; overflow: hidden; touch-action: none; font-family: sans-serif; }
-        /* Custom Scrollbar for Settings Panel */
+        :root {
+            --bg-base: #0f172a; --bg-panel: rgba(15, 23, 42, 0.95); --bg-panel-inner: rgba(15, 23, 42, 0.5); --bg-input: #020617;
+            --border-color: rgba(51, 65, 85, 0.8); --text-main: #e2e8f0; --text-muted: #94a3b8; --text-accent: #f59e0b;
+            --accent-sun: #f59e0b; --accent-planet: #3b82f6; --accent-ring: #ef4444; --accent-carrier: #10b981;
+            --font-sans: system-ui, -apple-system, sans-serif; --font-mono: ui-monospace, SFMono-Regular, monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: var(--bg-base); color: var(--text-main); font-family: var(--font-sans); overflow: hidden; touch-action: none; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #475569; }
 
-        /* Range slider styling overrides */
-        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
-        input[type=range] {
-            -webkit-appearance: none;
-            background: transparent;
-            height: 24px;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 14px;
-            width: 14px;
-            border-radius: 50%;
-            background: currentColor;
-            cursor: pointer;
-            margin-top: -5px;
-            box-shadow: 0 0 0 2px #0f172a;
-        }
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: #334155;
-            border-radius: 2px;
-        }
+        .text-xs { font-size: 0.75rem; } .text-sm { font-size: 0.875rem; } .text-lg { font-size: 1.125rem; font-weight: 700; }
+        .font-mono { font-family: var(--font-mono); } .font-bold { font-weight: 700; } .uppercase { text-transform: uppercase; }
+        .tracking-wider { letter-spacing: 0.05em; } .flex { display: flex; } .flex-col { flex-direction: column; }
+        .items-center { align-items: center; } .justify-between { justify-content: space-between; } .gap-2 { gap: 0.5rem; }
+        .w-full { width: 100%; } .hidden { display: none !important; }
+
+        #canvas-container { position: absolute; inset: 0; z-index: 0; outline: none; }
+        .floating-top-left { position: absolute; top: 1rem; left: 1rem; z-index: 10; transition: opacity 0.3s; }
+        .floating-top-right { position: absolute; top: 1rem; right: 1rem; z-index: 10; transition: opacity 0.3s; }
+        .floating-badges { position: absolute; top: 1rem; left: 50%; transform: translateX(-50%); z-index: 5; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
+        .floating-bottom { position: absolute; bottom: 1.5rem; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 0.75rem; pointer-events: none; }
+        @media (max-width: 768px) { .floating-badges { display: none; } .floating-bottom { flex-direction: column; width: 90%; align-items: center; } }
+
+        .side-panel { position: absolute; top: 0; bottom: 0; width: 340px; max-width: 100vw; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; flex-direction: column; z-index: 30; transition: transform 0.3s ease; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+        #panel-left { left: 0; border-right: 1px solid var(--border-color); transform: translateX(0); } #panel-left.closed { transform: translateX(-100%); }
+        #panel-right { right: 0; border-left: 1px solid var(--border-color); transform: translateX(0); } #panel-right.closed { transform: translateX(100%); }
+        .panel-header { padding: 1.25rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+        .panel-body { padding: 1rem; overflow-y: auto; flex: 1; }
+
+        button { cursor: pointer; border: none; background: none; font-family: inherit; color: inherit; display: flex; align-items: center; justify-content: center; outline: none; }
+        .btn-glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px); border: 1px solid var(--border-color); padding: 0.75rem 1rem; border-radius: 0.5rem; color: white; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: background 0.2s; }
+        .btn-glass:hover { background: rgba(30, 41, 59, 0.9); }
+        .badge { padding: 0.375rem 0.75rem; border-radius: 9999px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; backdrop-filter: blur(4px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .badge-green { background: rgba(2, 44, 34, 0.6); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; }
+        .badge-slate { background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); color: var(--text-main); }
         
-        .glass-panel { background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.5); }
+        .toolbar-group { pointer-events: auto; display: flex; background: rgba(6, 78, 59, 0.9); backdrop-filter: blur(8px); border-radius: 0.75rem; overflow: hidden; border: 1px solid rgba(16, 185, 129, 0.5); box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); }
+        .toolbar-btn { padding: 0.75rem 1.25rem; border-right: 1px solid rgba(4, 120, 87, 0.5); font-weight: bold; font-size: 0.875rem; transition: background 0.2s; color: white; }
+        .toolbar-btn:hover { background: rgba(4, 120, 87, 1); }
+        .toolbar-btn-dxf { background: rgba(4, 120, 87, 0.8); border-right: none; }
+
+        details { background: var(--bg-panel-inner); border: 1px solid var(--border-color); border-radius: 0.5rem; margin-bottom: 0.75rem; overflow: hidden; }
+        summary { background: rgba(30, 41, 59, 0.4); padding: 0.75rem; font-weight: 600; font-size: 0.875rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; user-select: none; list-style: none; }
+        summary::-webkit-details-marker { display: none; }
+        summary::after { content: '►'; font-size: 0.7rem; color: var(--text-muted); transition: transform 0.2s; }
+        details[open] summary { border-bottom: 1px solid var(--border-color); }
+        details[open] summary::after { transform: rotate(90deg); }
+        .details-content { padding: 1rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+        input[type=number] { background: var(--bg-input); border: 1px solid var(--border-color); color: inherit; padding: 0.25rem; border-radius: 0.25rem; text-align: center; font-family: var(--font-mono); width: 4rem; outline: none; }
+        input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+        input[type=range] { -webkit-appearance: none; background: transparent; height: 24px; width: 100%; cursor: pointer; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; height: 14px; width: 14px; border-radius: 50%; background: currentColor; margin-top: -5px; box-shadow: 0 0 0 2px var(--bg-base); }
+        input[type=range]::-webkit-slider-runnable-track { width: 100%; height: 4px; background: #334155; border-radius: 2px; }
+        input[type=checkbox] { cursor: pointer; width: 1rem; height: 1rem; accent-color: var(--accent-carrier); }
+
+        .text-sun { color: var(--accent-sun); accent-color: var(--accent-sun); } .text-planet { color: var(--accent-planet); accent-color: var(--accent-planet); } .text-ring { color: var(--accent-ring); accent-color: var(--accent-ring); } .text-carrier { color: var(--accent-carrier); accent-color: var(--accent-carrier); } .text-sky { color: #0ea5e9; accent-color: #0ea5e9; } .text-indigo { color: #818cf8; accent-color: #818cf8; } .text-purple { color: #c084fc; accent-color: #c084fc; }
+        .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; border-bottom: 1px solid rgba(30, 41, 59, 0.5); }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-label { color: var(--text-muted); font-size: 0.75rem; } .stat-value { font-family: var(--font-mono); font-size: 0.75rem; }
+        .btn-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+        .btn-toggle { background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-muted); padding: 0.375rem; border-radius: 0.25rem; font-size: 11px; font-weight: bold; text-transform: uppercase; transition: 0.2s; }
+        .btn-toggle:hover { background: rgba(30, 41, 59, 1); }
+        .btn-toggle.active { background: #10b981; color: white; border-color: #34d399; }
+        .divider { height: 1px; background: var(--border-color); margin: 1rem 0; }
+        .action-btn { background: #1e293b; padding: 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: bold; color: var(--text-main); flex: 1; transition: 0.2s; display: flex; gap: 0.5rem; align-items: center; justify-content: center;}
+        .action-btn:hover { background: #334155; } .danger-btn { background: rgba(127, 29, 29, 0.4); color: #f87171; border: 1px solid rgba(153, 27, 27, 0.5); width: 100%; margin-top: 0.5rem; } .danger-btn:hover { background: rgba(153, 27, 27, 0.6); }
+        svg { width: 1.25rem; height: 1.25rem; } .icon-sm { width: 1rem; height: 1rem; }
     </style>
 </head>
 <body>
-    <div id="root"></div>
 
-    <script type="text/babel">
-        /* ====================================================================
-          PLANETARY GEAR SUITE - TIER 1 (FREE COMMUNITY EDITION)
-          LICENSE: MIT License
-          
-          This is the open-source community edition of the Planetary Gear Suite.
-          It includes full 2D profiling and exports (SVG, DXF) for laser 
-          cutting, CNC routing, and blueprinting.
-          
-          SUPPORT THE PROJECT:
-          If this tool saved you hours of work, the best way to support the
-          developer is to upgrade to the Maker or Pro tiers!
-          
-          NEED 3D EXPORTS & ANALYTICS?
-          🛠️ Upgrade to Tier 2 (MAKER) for 3D Mesh (OBJ/STL) & Helix/Bevel features.
-             Link: [INSERT TIER 2 LINK HERE]
-          🚀 Upgrade to Tier 3 (PRO) for Solid B-Rep STEP, QC, & Stress Analytics.
-             Link: https://m87.lemonsqueezy.com/checkout/buy/63d6f42c-d4bf-4de5-b1c3-5c9cb39d05a1
-          ====================================================================
-        */
+    <div id="canvas-container"></div>
 
-        const { useState, useEffect, useRef, useCallback, useMemo } = React;
+    <div class="floating-top-left" id="toggle-left-container" style="opacity: 0;">
+        <button class="btn-glass" onclick="togglePanel('panel-left', false)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-carrier"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <span class="text-sm font-bold tracking-wider" style="margin-left:0.5rem;">CONTROLS</span>
+        </button>
+    </div>
 
-        // --- Inline Icon Components ---
-        const Settings = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
-        const Play = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>);
-        const Pause = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>);
-        const Download = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>);
-        const PenTool = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>);
-        const CheckCircle2 = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>);
-        const ChevronDown = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>);
-        const ChevronRight = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>);
-        const MousePointer2 = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 4 7.2 16.8a1 1 0 0 0 1.8.1l4-8 8-4a1 1 0 0 0 .1-1.8L4 2Z"/></svg>);
-        const ListTree = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M12 12s-3-1-3-4V4"/><path d="M9 8v12"/></svg>);
-        const Focus = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="3"/><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>);
-        const Save = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>);
-        const XIcon = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>);
-        const ShieldCheck = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>);
-        const Sparkles = ({ className }) => (<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>);
+    <div class="floating-top-right" id="toggle-right-container" style="opacity: 0;">
+        <button class="btn-glass" onclick="togglePanel('panel-right', false)">
+            <span class="text-sm font-bold tracking-wider" style="margin-right:0.5rem;">SPECS</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sky"><path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M12 12s-3-1-3-4V4"/><path d="M9 8v12"/></svg>
+        </button>
+    </div>
 
-        // --- Math Helpers ---
-        const invAngle = (alpha) => Math.tan(alpha) - alpha;
+    <div class="floating-badges">
+        <div class="badge badge-green flex items-center gap-2">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path></svg>
+            OpenSource Community Edition
+        </div>
+        <div class="badge badge-slate flex items-center gap-2">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 4 7.2 16.8a1 1 0 0 0 1.8.1l4-8 8-4a1 1 0 0 0 .1-1.8L4 2Z"/></svg>
+            Drag to Rotate • Scroll to Zoom • Right-Click Pan
+        </div>
+    </div>
 
-        // --- Constants ---
-        const PLANET_COLORS = [0x3B82F6, 0x8B5CF6, 0xEC4899, 0x14B8A6, 0xF97316, 0x06B6D4, 0xD946EF, 0x84CC16];
-        const SUN_COLOR = 0xF59E0B;
-        const RING_COLOR = 0xEF4444;
-        const CARRIER_COLOR = 0x10B981;
+    <div class="floating-bottom">
+        <div style="pointer-events: auto; display: flex; gap: 0.5rem;">
+            <button class="btn-glass" onclick="togglePlay()" id="btn-play" style="min-width: 110px;"></button>
+            <button class="btn-glass" onclick="resetCameraView()" title="Recenter Camera">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-sky"><circle cx="12" cy="12" r="3"/><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/></svg>
+            </button>
+        </div>
+        <div class="toolbar-group">
+            <button class="toolbar-btn flex items-center gap-2" onclick="downloadSVG()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>EXPORT SVG</span>
+            </button>
+            <button class="toolbar-btn toolbar-btn-dxf flex items-center gap-2" onclick="downloadDXF()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19 7-7 3 3-7 7-3-3z"/><path d="m18 13-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="m2 2 7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+                <span>EXPORT DXF</span>
+            </button>
+        </div>
+    </div>
 
-        // --- Custom Hook for Local Storage ---
-        function useLocalStorage(key, initialValue) {
-          const [storedValue, setStoredValue] = useState(() => {
-            try {
-              const item = window.localStorage.getItem(key);
-              return item ? JSON.parse(item) : initialValue;
-            } catch (error) {
-              return initialValue;
-            }
-          });
-          useEffect(() => { window.localStorage.setItem(key, JSON.stringify(storedValue)); }, [key, storedValue]);
-          return [storedValue, setStoredValue];
+    <!-- LEFT PANEL: Controls -->
+    <div id="panel-left" class="side-panel">
+        <div class="panel-header">
+            <div class="flex items-center gap-2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-carrier"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1-1-1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                <h1 class="text-[17px] font-bold" style="font-style: italic;">PLANETARY GEAR ENGINE</h1>
+            </div>
+            <button onclick="togglePanel('panel-left', true)" class="text-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="panel-body">
+            <details open>
+                <summary>⚙️ Kinematic Precision</summary>
+                <div class="details-content">
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-sm">Sun Teeth (S)</label><input type="number" data-bind="sunTeeth" class="text-sun" min="8" max="100"></div>
+                        <input type="range" id="range-sunTeeth" class="text-sun">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-sm">Planet Teeth (P)</label><input type="number" data-bind="planetTeeth" class="text-planet" min="8" max="50"></div>
+                        <input type="range" id="range-planetTeeth" class="text-planet">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-sm">Num Planets</label><input type="number" data-bind="numPlanets" class="text-carrier" min="2" max="20"></div>
+                        <input type="range" id="range-numPlanets" class="text-carrier">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-sm">Module (Size)</label><input type="number" data-bind="moduleSize" step="0.1" class="text-purple" min="1" max="10"></div>
+                        <input type="range" data-bind="moduleSize" step="0.1" min="1" max="10" class="text-purple">
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>🛠️ Profile Shift (x)</summary>
+                <div class="details-content">
+                    <div class="text-xs text-muted pb-2" style="border-bottom: 1px solid var(--border-color)">Thickens/thins teeth to prevent undercutting on small gears and precisely controls center distance.</div>
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-sm">Sun Shift (xs)</label><span class="font-mono text-sky" data-display="sunShift" data-format="fixed2"></span></div>
+                        <input type="range" data-bind="sunShift" step="0.01" min="-0.5" max="1.0" class="text-sky">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-sm">Planet Shift (xp)</label><span class="font-mono text-sky" data-display="planetShift" data-format="fixed2"></span></div>
+                        <input type="range" data-bind="planetShift" step="0.01" min="-0.5" max="1.0" class="text-sky">
+                    </div>
+                </div>
+            </details>
+
+            <details open>
+                <summary>📐 Dimensions & Holes</summary>
+                <div class="details-content">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <div class="flex justify-between mb-1"><label class="text-xs text-muted">Thickness (Z)</label></div>
+                            <div class="flex flex-col gap-2"><input type="number" data-bind="gearThickness" class="text-indigo w-full" min="5" max="50"><input type="range" data-bind="gearThickness" class="text-indigo" min="5" max="50" step="1"></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><label class="text-xs text-muted">Ring Wall</label></div>
+                            <div class="flex flex-col gap-2"><input type="number" data-bind="ringThickness" class="text-indigo w-full" min="5" max="50"><input type="range" data-bind="ringThickness" class="text-indigo" min="5" max="50" step="1"></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><label class="text-xs text-muted">Sun Hole</label></div>
+                            <div class="flex flex-col gap-2"><input type="number" data-bind="sunHole" class="text-sun w-full" step="0.5" min="0" max="50"><input type="range" data-bind="sunHole" class="text-sun" min="0" max="50" step="0.5"></div>
+                        </div>
+                        <div>
+                            <div class="flex justify-between mb-1"><label class="text-xs text-muted">Planet Hole</label></div>
+                            <div class="flex flex-col gap-2"><input type="number" data-bind="planetHole" class="text-planet w-full" step="0.5" min="0" max="50"><input type="range" data-bind="planetHole" class="text-planet" min="0" max="50" step="0.5"></div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>🔬 Advanced Profiling</summary>
+                <div class="details-content">
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-sm">Pressure Angle</label><span class="font-mono text-muted"><span data-display="pressureAngle"></span>°</span></div>
+                        <input type="range" data-bind="pressureAngle" min="14.5" max="30" step="0.5">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-sm">Clearance Coeff.</label><span class="font-mono text-muted" data-display="clearance" data-format="fixed2"></span></div>
+                        <input type="range" data-bind="clearance" min="0.1" max="0.5" step="0.05">
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-sm">Backlash (Tol.)</label><span class="font-mono text-muted"><span data-display="backlash" data-format="fixed2"></span> mm</span></div>
+                        <input type="range" data-bind="backlash" min="0" max="1" step="0.05">
+                    </div>
+                </div>
+            </details>
+
+            <details>
+                <summary>🎬 Environment & Export</summary>
+                <div class="details-content">
+                    <div>
+                        <label class="text-xs text-muted font-bold uppercase tracking-wider block mb-2">Fixed Kinematic Part</label>
+                        <div class="btn-group">
+                            <button class="btn-toggle btn-toggle-part" data-val="ring" onclick="setFixedPart('ring')">Ring</button>
+                            <button class="btn-toggle btn-toggle-part" data-val="sun" onclick="setFixedPart('sun')">Sun</button>
+                            <button class="btn-toggle btn-toggle-part" data-val="carrier" onclick="setFixedPart('carrier')">Carrier</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between mb-1"><label class="text-xs text-muted font-bold uppercase tracking-wider">Input Speed</label></div>
+                        <input type="range" data-bind="speed" min="-100" max="100" step="1">
+                    </div>
+                    <div class="divider" style="margin:0"></div>
+                    <div>
+                        <label class="text-xs text-muted font-bold uppercase tracking-wider block mb-2">Export Target (SVG/DXF)</label>
+                        <div class="btn-group" style="grid-template-columns: repeat(2, 1fr);">
+                            <button class="btn-toggle btn-export-target" data-val="all" onclick="setExportTarget('all')">Assembly (All)</button>
+                            <button class="btn-toggle btn-export-target" data-val="sun" onclick="setExportTarget('sun')">Sun Only</button>
+                            <button class="btn-toggle btn-export-target" data-val="planet" onclick="setExportTarget('planet')">Planet Only</button>
+                            <button class="btn-toggle btn-export-target" data-val="ring" onclick="setExportTarget('ring')">Ring Only</button>
+                        </div>
+                    </div>
+                    <label class="flex items-center gap-2 mt-2"><input type="checkbox" data-bind="showCarrier"><span class="text-sm">Show Carrier Frame</span></label>
+                </div>
+            </details>
+
+            <details>
+                <summary>💾 Save & Load Profile</summary>
+                <div class="details-content" style="gap: 0.5rem">
+                    <div class="flex gap-2">
+                        <button class="action-btn" onclick="exportJSON()">Export JSON</button>
+                        <label class="action-btn" style="cursor: pointer;">Import JSON<input type="file" accept=".json" class="hidden" onchange="importJSON(event)"></label>
+                    </div>
+                    <button class="action-btn" id="btn-offline" onclick="downloadOfflineVersion()" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4);">Download Standalone/Offline App</button>
+                    <button class="action-btn danger-btn" onclick="resetDefaults()">Reset All to Defaults</button>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <!-- RIGHT PANEL: Analytics -->
+    <div id="panel-right" class="side-panel">
+        <div class="panel-header">
+            <div class="flex items-center gap-2 text-sky">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                <h2 class="text-lg font-bold tracking-tight text-main">System Specifications</h2>
+            </div>
+            <button onclick="togglePanel('panel-right', true)" class="text-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>
+        <div class="panel-body">
+            
+            <div style="background: rgba(2, 6, 23, 0.5); padding: 1rem; border-radius: 0.25rem; border: 1px solid rgba(30, 41, 59, 0.8); margin-bottom: 1rem;">
+                <div class="stat-row">
+                    <span class="text-sm font-bold text-muted">True Center Dist.</span>
+                    <span class="font-mono text-carrier font-bold text-lg"><span data-display="r_c" data-format="fixed3"></span> <span class="text-xs text-muted">mm</span></span>
+                </div>
+                <div class="stat-row">
+                    <span class="text-sm font-bold text-muted">Working PA (αw)</span>
+                    <span class="font-mono text-sky font-bold text-lg"><span data-display="alphaW_deg" data-format="fixed2"></span>°</span>
+                </div>
+                <div class="stat-row">
+                    <span class="text-sm font-bold text-ring">Ring Teeth (R)</span>
+                    <span class="font-mono text-main font-bold text-lg" data-display="ringTeeth"></span>
+                </div>
+                <div class="stat-row">
+                    <span class="text-sm font-bold text-muted">Gear Ratio</span>
+                    <span class="font-mono text-accent font-bold text-lg" data-display="gearRatio"></span>
+                </div>
+            </div>
+
+            <details open>
+                <summary>System Geometry</summary>
+                <div class="details-content" style="gap:0">
+                    <div class="stat-row"><span class="stat-label">Module (m)</span><span class="stat-value" data-display="moduleSize" data-format="fixed2"></span></div>
+                    <div class="stat-row"><span class="stat-label">Pressure Angle (α)</span><span class="stat-value"><span data-display="pressureAngle"></span>°</span></div>
+                    <div class="stat-row"><span class="stat-label">Circular Pitch (p)</span><span class="stat-value" data-display="circularPitch" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Base Pitch (pb)</span><span class="stat-value" data-display="basePitch" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Clearance (c)</span><span class="stat-value" data-display="clearanceAbs" data-format="fixed3"></span></div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Sun Gear (Center)</summary>
+                <div class="details-content" style="gap:0">
+                    <div class="stat-row"><span class="stat-label">Teeth (z)</span><span class="stat-value text-sun" data-display="sunTeeth"></span></div>
+                    <div class="stat-row"><span class="stat-label">Profile Shift (x)</span><span class="stat-value" data-display="sunShift" data-format="fixed2"></span></div>
+                    <div class="stat-row"><span class="stat-label">Pitch Dia. (d)</span><span class="stat-value" data-display="sun_d" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Base Dia. (db)</span><span class="stat-value" data-display="sun_db" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Outer Dia. (da)</span><span class="stat-value" data-display="sun_da" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Root Dia. (df)</span><span class="stat-value" data-display="sun_df" data-format="fixed3"></span></div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Planet Gears (Orbiters)</summary>
+                <div class="details-content" style="gap:0">
+                    <div class="stat-row"><span class="stat-label">Teeth (z)</span><span class="stat-value text-planet" data-display="planetTeeth"></span></div>
+                    <div class="stat-row"><span class="stat-label">Profile Shift (x)</span><span class="stat-value" data-display="planetShift" data-format="fixed2"></span></div>
+                    <div class="stat-row"><span class="stat-label">Pitch Dia. (d)</span><span class="stat-value" data-display="planet_d" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Base Dia. (db)</span><span class="stat-value" data-display="planet_db" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Outer Dia. (da)</span><span class="stat-value" data-display="planet_da" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Root Dia. (df)</span><span class="stat-value" data-display="planet_df" data-format="fixed3"></span></div>
+                </div>
+            </details>
+
+            <details>
+                <summary>Ring Gear (Outer)</summary>
+                <div class="details-content" style="gap:0">
+                    <div class="stat-row"><span class="stat-label">Teeth (z)</span><span class="stat-value text-ring" data-display="ringTeeth"></span></div>
+                    <div class="stat-row"><span class="stat-label">Pitch Dia. (d)</span><span class="stat-value" data-display="ring_d" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Base Dia. (db)</span><span class="stat-value" data-display="ring_db" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Inner Dia. (Tip) (da)</span><span class="stat-value" data-display="ring_da" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Root Dia. (df)</span><span class="stat-value" data-display="ring_df" data-format="fixed3"></span></div>
+                    <div class="stat-row"><span class="stat-label">Outer Casing Dia.</span><span class="stat-value" data-display="ring_outer" data-format="fixed3"></span></div>
+                </div>
+            </details>
+
+            <!-- TIER 1 MONETIZATION FUNNEL -->
+            <div style="background: rgba(30, 41, 59, 0.4); border: 1px solid var(--border-color); border-radius: 0.5rem; padding: 1rem; margin-top: 1.5rem;">
+                <div style="text-align: center; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1rem;">
+                    <svg style="width: 24px; height: 24px; color: #fbbf24; margin: 0 auto 0.5rem auto;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/></svg>
+                    <h3 style="color: white; font-weight: bold; margin-bottom: 0.5rem; font-size: 0.875rem;">Support the Developer</h3>
+                    <p style="color: #94a3b8; font-size: 0.75rem; line-height: 1.5;">If this free tool saved you hours of CAD sketching, the best way to support the project is to grab a lifetime upgrade!</p>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <a href="https://m87.lemonsqueezy.com/checkout/buy/25be5fef-a293-4d93-89ea-2c64810bb275" target="_blank" style="text-decoration: none; display: block; padding: 0.75rem; background: rgba(49, 46, 129, 0.3); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 0.25rem; transition: background 0.2s;" onmouseover="this.style.background='rgba(49, 46, 129, 0.6)'" onmouseout="this.style.background='rgba(49, 46, 129, 0.3)'">
+                        <div style="font-size: 0.7rem; font-weight: bold; color: #a5b4fc; text-transform: uppercase; margin-bottom: 0.25rem;">Tier 2: Maker Edition</div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 0.5rem;">Unlocks 3D Mesh (OBJ/STL), Helix Angles, & Bevels.</div>
+                        <div style="font-size: 0.7rem; font-weight: bold; color: #818cf8;">Get Maker Tier $19.99 Lifetime ►</div>
+                    </a>
+                    <a href="https://m87.lemonsqueezy.com/checkout/buy/63d6f42c-d4bf-4de5-b1c3-5c9cb39d05a1" target="_blank" style="text-decoration: none; display: block; padding: 0.75rem; background: rgba(120, 53, 15, 0.3); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 0.25rem; transition: background 0.2s;" onmouseover="this.style.background='rgba(120, 53, 15, 0.6)'" onmouseout="this.style.background='rgba(120, 53, 15, 0.3)'">
+                        <div style="font-size: 0.7rem; font-weight: bold; color: #fcd34d; text-transform: uppercase; margin-bottom: 0.25rem;">Tier 3: Pro Edition</div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; margin-bottom: 0.5rem;">Unlocks Solid B-Rep STEP, QC (MOP), & Stress Analytics.</div>
+                        <div style="font-size: 0.7rem; font-weight: bold; color: #fbbf24;">Get Pro Tier $49.99 Lifetime ►</div>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- VANILLA JAVASCRIPT LOGIC -->
+    <script>
+        const defaultState = {
+            sunTeeth: 15, planetTeeth: 12, numPlanets: 3, moduleSize: 3,
+            sunShift: 0.0, planetShift: 0.0, ringShift: 0.0, 
+            pressureAngle: 20, clearance: 0.25, backlash: 0.4,
+            gearThickness: 10, ringThickness: 12,
+            sunHole: 10, planetHole: 8,
+            fixedPart: 'ring', speed: 50, isPlaying: true, showCarrier: true, exportTarget: 'all'
+        };
+
+        const StructuralKeys = ['sunTeeth', 'planetTeeth', 'numPlanets', 'moduleSize', 'sunShift', 'planetShift', 'ringShift', 'pressureAngle', 'clearance', 'backlash', 'gearThickness', 'ringThickness', 'sunHole', 'planetHole', 'showCarrier'];
+
+        let initialState = { ...defaultState };
+        for (let key in defaultState) {
+            try { const stored = localStorage.getItem('pg_' + key); if (stored !== null) initialState[key] = JSON.parse(stored); } catch (e) {}
         }
 
-        // --- UI Components ---
-        const Panel = ({ title, defaultOpen = false, children }) => {
-            const [isOpen, setIsOpen] = useState(defaultOpen);
-            return (
-                <div className="border border-slate-800/80 rounded-lg bg-slate-900/50 overflow-hidden mb-3">
-                    <button 
-                        onClick={() => setIsOpen(!isOpen)}
-                        className="w-full p-3 flex justify-between items-center bg-slate-800/40 hover:bg-slate-800/80 transition-colors focus:outline-none"
-                    >
-                        <span className="font-semibold text-slate-200 text-sm tracking-wide">{title}</span>
-                        <span className="text-slate-400">
-                            {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                        </span>
-                    </button>
-                    {isOpen && <div className="p-4 space-y-5 bg-slate-900/20">{children}</div>}
-                </div>
-            );
-        };
-
-        const NumberInput = ({ value, onChange, min, max, step, colorClass, widthClass, validArray }) => {
-            const handleBlur = (e) => {
-                let val = parseFloat(e.target.value) || 0;
-                if (validArray && validArray.length > 0 && !validArray.includes(val)) {
-                    val = validArray.reduce((prev, curr) => Math.abs(curr - val) < Math.abs(prev - val) ? curr : prev);
+        const State = new Proxy(initialState, {
+            set(target, prop, value) {
+                if (target[prop] !== value) {
+                    target[prop] = value;
+                    localStorage.setItem('pg_' + prop, JSON.stringify(value));
+                    calculateDerivedState(); updateDOM();
+                    if (Engine.initialized) {
+                        Engine.renderRequest = true;
+                        if (StructuralKeys.includes(prop)) {
+                            clearTimeout(Engine.rebuildTimer);
+                            Engine.rebuildTimer = setTimeout(() => rebuildMeshes(), 30);
+                        }
+                    }
                 }
-                onChange(val);
-            };
+                return true;
+            }
+        });
 
-            return (
-                <input 
-                    type="number" 
-                    value={value} 
-                    min={min} 
-                    max={max} 
-                    step={step}
-                    onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-                    onBlur={handleBlur}
-                    className={`bg-slate-950 border border-slate-700 p-1 rounded text-center font-mono focus:outline-none focus:border-slate-500 ${colorClass || ''} ${widthClass || 'w-16'}`}
-                />
-            );
-        };
+        const Derived = {};
+        const Engine = { scene: null, camera: null, renderer: null, controls: null, meshes: { planets: [] }, time: 0, initialized: false, renderRequest: true, panOffset: { x: 0, y: 0 }, rebuildTimer: null, mats: {} };
 
-        const StatRow = ({ label, value, symbol }) => (
-            <div className="flex justify-between items-center py-1.5 border-b border-slate-800/50 last:border-0">
-                <span className="text-slate-400 text-xs flex items-center gap-1">
-                    {label} {symbol && <span className="italic opacity-50 font-serif">({symbol})</span>}
-                </span>
-                <span className="font-mono text-slate-200 text-xs">{value}</span>
-            </div>
-        );
+        const invAngle = (alpha) => Math.tan(alpha) - alpha;
+        function isValidParams(s, p, n) { if ((2 * s + 2 * p) % n !== 0) return false; const minDistance = (s + p) * Math.sin(Math.PI / n); return minDistance > (p + 2.1); }
 
-        // --- Smart RDP Vector Optimization Algorithm ---
         const simplifyRDP = (pts, epsilon) => {
             if (pts.length <= 2 || epsilon === 0) return pts;
             let dmax = 0, index = 0, end = pts.length - 1;
-            const p1 = pts[0], p2 = pts[end];
-            const dx = p2.x - p1.x, dy = p2.y - p1.y;
-            const magSq = dx * dx + dy * dy;
-            
+            const dx = pts[end].x - pts[0].x, dy = pts[end].y - pts[0].y, magSq = dx * dx + dy * dy;
             for (let i = 1; i < end; i++) {
-                const p = pts[i];
                 let d = 0;
-                if (magSq === 0) {
-                    d = Math.hypot(p.x - p1.x, p.y - p1.y);
-                } else {
-                    let t = ((p.x - p1.x) * dx + (p.y - p1.y) * dy) / magSq;
-                    t = Math.max(0, Math.min(1, t));
-                    const projX = p1.x + t * dx;
-                    const projY = p1.y + t * dy;
-                    d = Math.hypot(p.x - projX, p.y - projY);
+                if (magSq === 0) d = Math.hypot(pts[i].x - pts[0].x, pts[i].y - pts[0].y);
+                else {
+                    let t = Math.max(0, Math.min(1, ((pts[i].x - pts[0].x) * dx + (pts[i].y - pts[0].y) * dy) / magSq));
+                    d = Math.hypot(pts[i].x - (pts[0].x + t * dx), pts[i].y - (pts[0].y + t * dy));
                 }
                 if (d > dmax) { index = i; dmax = d; }
             }
-            if (dmax > epsilon) {
-                const r1 = simplifyRDP(pts.slice(0, index + 1), epsilon);
-                const r2 = simplifyRDP(pts.slice(index), epsilon);
-                return r1.slice(0, r1.length - 1).concat(r2);
-            } else {
-                return [pts[0], pts[end]];
-            }
+            return dmax > epsilon ? simplifyRDP(pts.slice(0, index + 1), epsilon).slice(0, -1).concat(simplifyRDP(pts.slice(index), epsilon)) : [pts[0], pts[end]];
         };
 
-        const disposeNode = (node) => {
-            if (!node) return; 
-            if (node.geometry && typeof node.geometry.dispose === 'function') node.geometry.dispose();
-            if (node.material) {
-                if (Array.isArray(node.material)) {
-                    node.material.forEach(m => { if (m && typeof m.dispose === 'function') m.dispose(); });
-                } else if (typeof node.material.dispose === 'function') {
-                    node.material.dispose();
-                }
+        function calculateDerivedState() {
+            const S = State.sunTeeth, P = State.planetTeeth, N = State.numPlanets, m = State.moduleSize;
+            Derived.validS = []; for (let i = 8; i <= 100; i++) if (isValidParams(i, P, N)) Derived.validS.push(i); if(Derived.validS.length===0) Derived.validS = [S];
+            Derived.validP = []; for (let i = 8; i <= 50; i++) if (isValidParams(S, i, N)) Derived.validP.push(i); if(Derived.validP.length===0) Derived.validP = [P];
+            Derived.validN = []; for (let i = 2; i <= 20; i++) if (isValidParams(S, P, i)) Derived.validN.push(i); if(Derived.validN.length===0) Derived.validN = [N];
+
+            Derived.ringTeeth = S + 2 * P; Derived.paRad = State.pressureAngle * (Math.PI / 180);
+            const invAlphaW = invAngle(Derived.paRad) + 2 * ((State.sunShift + State.planetShift) / (S + P)) * Math.tan(Derived.paRad);
+            let alphaW_val = Derived.paRad;
+            if (invAlphaW > invAngle(Derived.paRad)) {
+                let a = Derived.paRad, b = Math.PI / 2.1;
+                for (let i = 0; i < 15; i++) { let mid = (a + b) / 2; if (invAngle(mid) < invAlphaW) a = mid; else b = mid; }
+                alphaW_val = (a + b) / 2;
             }
-            if (node.children && Array.isArray(node.children)) {
-                [...node.children].forEach(child => disposeNode(child));
-            }
-        };
+            Derived.alphaW = alphaW_val; Derived.alphaW_deg = Derived.alphaW * 180 / Math.PI;
 
-        // ====================================================================
-        // THE MAIN GEAR ENGINE APP
-        // ====================================================================
-        function App() {
-          // 0. UI State
-          const [leftOpen, setLeftOpen] = useState(true);
-          const [rightOpen, setRightOpen] = useState(true);
+            Derived.r_c = ((S + P) * m * Math.cos(Derived.paRad)) / (2 * Math.cos(Derived.alphaW));
+            Derived.r_s = (S * m) / 2; Derived.r_p = (P * m) / 2; Derived.r_r = (Derived.ringTeeth * m) / 2;
 
-          useEffect(() => {
-              if (window.innerWidth < 1024) {
-                  setLeftOpen(false);
-                  setRightOpen(false);
-              }
-          }, []);
+            Derived.safeSunHole = Math.min(State.sunHole, Math.max(1, Math.floor((S * m) - (3 * m))));
+            Derived.safePlanetHole = Math.min(State.planetHole, Math.max(1, Math.floor((P * m) - (3 * m))));
 
-          // 1. Core Params
-          const [sunTeeth, setSunTeeth] = useLocalStorage('pg_sunTeeth', 15);
-          const [planetTeeth, setPlanetTeeth] = useLocalStorage('pg_planetTeeth', 12);
-          const [numPlanets, setNumPlanets] = useLocalStorage('pg_numPlanets', 3);
-          const [moduleSize, setModuleSize] = useLocalStorage('pg_moduleSize', 3);
-          
-          // Profile Shifts
-          const [sunShift, setSunShift] = useLocalStorage('pg_sunShift', 0.0);
-          const [planetShift, setPlanetShift] = useLocalStorage('pg_planetShift', 0.0);
-          const [ringShift, setRingShift] = useLocalStorage('pg_ringShift', 0.0);
+            Derived.circularPitch = Math.PI * m; Derived.basePitch = Math.PI * m * Math.cos(Derived.paRad); Derived.clearanceAbs = State.clearance * m;
+            Derived.sun_d = Derived.r_s * 2; Derived.sun_db = Derived.sun_d * Math.cos(Derived.paRad); Derived.sun_da = (S + 2 + 2 * State.sunShift) * m; Derived.sun_df = S * m - 2 * (1 + State.clearance - State.sunShift) * m;
+            Derived.planet_d = Derived.r_p * 2; Derived.planet_db = Derived.planet_d * Math.cos(Derived.paRad); Derived.planet_da = (P + 2 + 2 * State.planetShift) * m; Derived.planet_df = P * m - 2 * (1 + State.clearance - State.planetShift) * m;
+            Derived.ring_d = Derived.r_r * 2; Derived.ring_db = Derived.ring_d * Math.cos(Derived.paRad); Derived.ring_da = (Derived.ringTeeth - 2) * m; Derived.ring_df = Derived.ringTeeth * m + 2 * (1 + State.clearance) * m; Derived.ring_outer = Derived.ring_d + State.ringThickness * 2;
+        }
 
-          // 2. Clearances
-          const [pressureAngle, setPressureAngle] = useLocalStorage('pg_pressureAngle', 20);
-          const [clearance, setClearance] = useLocalStorage('pg_clearance', 0.25);
-          const [backlash, setBacklash] = useLocalStorage('pg_backlash', 0.4); 
-          
-          // 3. Dimensions
-          const [gearThickness, setGearThickness] = useLocalStorage('pg_gearThickness', 10);
-          const [ringThickness, setRingThickness] = useLocalStorage('pg_ringThickness', 12);
-          const [sunHole, setSunHole] = useLocalStorage('pg_sunHole', 10);
-          const [planetHole, setPlanetHole] = useLocalStorage('pg_planetHole', 8);
+        function getGearRatioText() {
+            const S = State.sunTeeth, R = Derived.ringTeeth;
+            if (State.fixedPart === 'ring') return `1 : ${((S + R) / S).toFixed(2)}`;
+            if (State.fixedPart === 'sun') return `1 : ${((S + R) / R).toFixed(2)}`;
+            if (State.fixedPart === 'carrier') return `1 : -${(R / S).toFixed(2)}`;
+            return "1 : 1";
+        }
 
-          // 5. Display Options
-          const [fixedPart, setFixedPart] = useLocalStorage('pg_fixedPart', 'ring');
-          const [speed, setSpeed] = useLocalStorage('pg_speed', 50);
-          const [isPlaying, setIsPlaying] = useLocalStorage('pg_isPlaying', true);
-          const [showCarrier, setShowCarrier] = useLocalStorage('pg_showCarrier', true);
-
-          // Three.js References
-          const mountRef = useRef(null);
-          const sceneRef = useRef(new THREE.Scene());
-          const rendererRef = useRef(null);
-          const cameraRef = useRef(null);
-          const controlsRef = useRef(null);
-          const meshesRef = useRef({});
-          const timeRef = useRef(0);
-          const renderRequestRef = useRef(true); 
-          const initializedCamera = useRef(false);
-          const panOffset = useRef({ x: 0, y: 0 }); 
-
-          // --- PERFORMANCE: Cache Materials to prevent GC stuttering ---
-          const materialsRef = useRef({
-              sun: new THREE.MeshStandardMaterial({ color: SUN_COLOR, metalness: 0.2, roughness: 0.4 }),
-              ring: new THREE.MeshStandardMaterial({ color: RING_COLOR, metalness: 0.2, roughness: 0.4, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
-              carrier: new THREE.MeshStandardMaterial({ color: CARRIER_COLOR, transparent: true, opacity: 0.2, depthWrite: false }),
-              planets: PLANET_COLORS.map(c => new THREE.MeshStandardMaterial({ color: c, metalness: 0.2, roughness: 0.4 }))
-          });
-
-          // --- Import / Export / Defaults ---
-          const exportSettings = () => {
-              const keys = Object.keys(window.localStorage).filter(k => k.startsWith('pg_'));
-              const settings = {};
-              keys.forEach(k => settings[k] = JSON.parse(window.localStorage.getItem(k)));
-              const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `planetary-gear-profile.json`;
-              a.click();
-              URL.revokeObjectURL(url);
-          };
-
-          const importSettings = (e) => {
-              const file = e.target.files[0];
-              if (!file) return;
-              const reader = new FileReader();
-              reader.onload = (event) => {
-                  try {
-                      const settings = JSON.parse(event.target.result);
-                      Object.keys(settings).forEach(k => {
-                          if (k.startsWith('pg_')) window.localStorage.setItem(k, JSON.stringify(settings[k]));
-                      });
-                      window.location.reload();
-                  } catch(err) {
-                      alert("Invalid profile file.");
-                  }
-              };
-              reader.readAsText(file);
-          };
-
-          const resetDefaults = () => {
-              if (window.confirm("Reset all settings to original defaults?")) {
-                  Object.keys(window.localStorage).forEach(k => {
-                      if (k.startsWith('pg_')) window.localStorage.removeItem(k);
-                  });
-                  window.location.reload();
-              }
-          };
-
-          const isValidParams = useCallback((s, p, n) => {
-            if ((2 * s + 2 * p) % n !== 0) return false;
-            const minDistance = (s + p) * Math.sin(Math.PI / n);
-            const requiredDistance = p + 2.1; 
-            if (minDistance <= requiredDistance) return false;
-            return true;
-          }, []);
-
-          const validS = useMemo(() => {
-            let valid = [];
-            for (let i = 8; i <= 100; i++) if (isValidParams(i, planetTeeth, numPlanets)) valid.push(i);
-            return valid.length ? valid : [sunTeeth];
-          }, [planetTeeth, numPlanets, isValidParams, sunTeeth]);
-
-          const validP = useMemo(() => {
-            let valid = [];
-            for (let i = 8; i <= 50; i++) if (isValidParams(sunTeeth, i, numPlanets)) valid.push(i);
-            return valid.length ? valid : [planetTeeth];
-          }, [sunTeeth, numPlanets, isValidParams, planetTeeth]);
-
-          const validN = useMemo(() => {
-            let valid = [];
-            for (let i = 2; i <= 20; i++) if (isValidParams(sunTeeth, planetTeeth, i)) valid.push(i);
-            return valid.length ? valid : [numPlanets];
-          }, [sunTeeth, planetTeeth, isValidParams, numPlanets]);
-
-          // MATH: Center Distance & Working Pressure Angle Calculation
-          const paRad = pressureAngle * (Math.PI / 180);
-          
-          const invAlphaW = useMemo(() => {
-              return invAngle(paRad) + 2 * ((sunShift + planetShift) / (sunTeeth + planetTeeth)) * Math.tan(paRad);
-          }, [paRad, sunShift, planetShift, sunTeeth, planetTeeth]);
-          
-          const alphaW = useMemo(() => {
-              let a = paRad, b = Math.PI / 2.1;
-              if (invAlphaW <= invAngle(paRad)) return paRad; 
-              for (let i = 0; i < 15; i++) {
-                  let mid = (a + b) / 2;
-                  if (invAngle(mid) < invAlphaW) a = mid; else b = mid;
-              }
-              return (a + b) / 2;
-          }, [invAlphaW, paRad]);
-
-          // True operative center distance with profile shift applied
-          const r_c = ((sunTeeth + planetTeeth) * moduleSize * Math.cos(paRad)) / (2 * Math.cos(alphaW));
-
-          const ringTeeth = sunTeeth + 2 * planetTeeth;
-          const r_s = (sunTeeth * moduleSize) / 2;
-          const r_p = (planetTeeth * moduleSize) / 2;
-          const r_r = (ringTeeth * moduleSize) / 2; // Nominal
-
-          const maxSunHole = Math.max(1, Math.floor((sunTeeth * moduleSize) - (3 * moduleSize)));
-          const maxPlanetHole = Math.max(1, Math.floor((planetTeeth * moduleSize) - (3 * moduleSize)));
-          const safeSunHole = Math.min(sunHole, maxSunHole);
-          const safePlanetHole = Math.min(planetHole, maxPlanetHole);
-
-          const calculateSpeeds = useCallback(() => {
-            const S = sunTeeth;
-            const R = ringTeeth;
-            const baseSpeedInput = (speed / 100) * 0.05;
+        function calculateSpeeds() {
+            const S = State.sunTeeth, R = Derived.ringTeeth, baseSpeed = (State.speed / 100) * 0.05;
             let w_s = 0, w_c = 0, w_r = 0;
-
-            if (fixedPart === 'ring') {
-              w_r = 0; w_s = baseSpeedInput; w_c = w_s * S / (S + R);
-            } else if (fixedPart === 'sun') {
-              w_s = 0; w_r = baseSpeedInput; w_c = w_r * R / (S + R);
-            } else if (fixedPart === 'carrier') {
-              w_c = 0; w_s = baseSpeedInput; w_r = -w_s * S / R;
-            }
+            if (State.fixedPart === 'ring') { w_s = baseSpeed; w_c = w_s * S / (S + R); } 
+            else if (State.fixedPart === 'sun') { w_r = baseSpeed; w_c = w_r * R / (S + R); } 
+            else if (State.fixedPart === 'carrier') { w_s = baseSpeed; w_r = -w_s * S / R; }
             return { w_s, w_c, w_r };
-          }, [sunTeeth, ringTeeth, fixedPart, speed]);
+        }
 
-          const gearRatioText = () => {
-            const S = sunTeeth;
-            const R = ringTeeth;
-            let ratio = 1;
-            if (fixedPart === 'ring') {
-              ratio = (S + R) / S;
-              return `1 : ${ratio.toFixed(2)}`;
-            } else if (fixedPart === 'sun') {
-              ratio = (S + R) / R;
-              return `1 : ${ratio.toFixed(2)}`;
-            } else if (fixedPart === 'carrier') {
-              ratio = R / S;
-              return `1 : -${ratio.toFixed(2)}`;
-            }
-          };
-
-          const calculateSpeedsRef = useRef(calculateSpeeds);
-          const isPlayingRef = useRef(isPlaying);
-          useEffect(() => { calculateSpeedsRef.current = calculateSpeeds; }, [calculateSpeeds]);
-          useEffect(() => { isPlayingRef.current = isPlaying; renderRequestRef.current = true; }, [isPlaying]);
-
-          // --- SMART RDP VECTORIZED INVOLUTE GENERATOR (WITH PROFILE SHIFT) ---
-          const generateGearSegments = useCallback((teeth, pitchRadius, mod, isInternal, profileShift = 0, isPreview = false, resolution = 'Medium') => {
-            const paRad = pressureAngle * (Math.PI / 180);
-            const baseRadius = pitchRadius * Math.cos(paRad);
-            
-            // Adjust Addendum and Dedendum via profile shift
-            const addendum = mod * (1 + profileShift);
-            const dedendum = mod * (1 + clearance - profileShift);
-
-            // Safely adjust Root and Tip limits
-            const tipRadius = isInternal ? pitchRadius - mod * (1 - profileShift) : pitchRadius + addendum;
-            const rootRadius = isInternal ? pitchRadius + mod * (1 + clearance + profileShift) : pitchRadius - dedendum;
-
-            const anglePerTooth = (Math.PI * 2) / teeth;
-            // Shift modifies tooth thickness at pitch circle
-            const halfToothAngleAtPitch = (Math.PI / 2 + 2 * profileShift * Math.tan(paRad)) / teeth;
-            const backlashAngle = backlash / (2 * pitchRadius);
-
-            const inv = (r) => {
-              if (r <= baseRadius) return 0;
-              const alpha = Math.acos(baseRadius / r);
-              return Math.tan(alpha) - alpha;
-            };
-            const pitchInv = inv(pitchRadius);
-
-            let epsilon = 0;
-            let steps = 6; 
-            let arcSteps = 2; 
-            
-            if (!isPreview) {
-                if (resolution === 'High') { steps = 20; arcSteps = 8; epsilon = 0.01; }
-                else if (resolution === 'Medium') { steps = 10; arcSteps = 4; epsilon = 0.05; } 
-                else { steps = 6; arcSteps = 2; epsilon = 0.15; }
-            } else {
-                steps = 4; arcSteps = 1; epsilon = 0.3;
-            }
-
-            let segments = []; 
-
-            for (let i = 0; i < teeth; i++) {
-              let centerAngle = i * anglePerTooth;
-              let leftProfile = [];
-              let rightProfile = [];
-
-              const rInner = isInternal ? tipRadius : rootRadius;
-              const rOuter = isInternal ? rootRadius : tipRadius;
-
-              for (let j = 0; j <= steps; j++) {
-                const t = j / steps;
-                const easedT = 0.5 - 0.5 * Math.cos(t * Math.PI);
-                const r = rInner + (rOuter - rInner) * easedT;
-
-                // Ensure involute curve math clamps properly to base circle
-                const rCalc = Math.max(r, baseRadius);
-                const thetaInv = inv(rCalc);
-
-                let angleOffset = halfToothAngleAtPitch + pitchInv - thetaInv;
-                
-                if (isInternal) {
-                    angleOffset += backlashAngle; 
-                } else {
-                    angleOffset -= backlashAngle;
-                }
-                
-                angleOffset = Math.max(0.0001, angleOffset); 
-
-                // r uses true radius allowing radial generation below base circle
-                leftProfile.push({ r, theta: centerAngle - angleOffset });
-                rightProfile.unshift({ r, theta: centerAngle + angleOffset });
-              }
-
-              let leftPts = leftProfile.map(p => ({ x: p.r * Math.cos(p.theta), y: p.r * Math.sin(p.theta) }));
-              if (epsilon > 0) leftPts = simplifyRDP(leftPts, epsilon);
-              
-              let topPts = [];
-              const rTop = rOuter;
-              const tts = leftProfile[leftProfile.length - 1].theta;
-              let tte = rightProfile[0].theta;
-              if (Math.abs(tte - tts) < 1e-4) tte = tts + 1e-4; 
-              
-              for (let a = 0; a <= arcSteps; a++) {
-                  const theta = tts + (tte - tts) * (a / arcSteps);
-                  topPts.push({ x: rTop * Math.cos(theta), y: rTop * Math.sin(theta) });
-              }
-              if (epsilon > 0) topPts = simplifyRDP(topPts, epsilon);
-
-              let rightPts = rightProfile.map(p => ({ x: p.r * Math.cos(p.theta), y: p.r * Math.sin(p.theta) }));
-              if (epsilon > 0) rightPts = simplifyRDP(rightPts, epsilon);
-
-              let botPts = [];
-              const rBot = rInner;
-              const tbs = rightProfile[rightProfile.length - 1].theta;
-              let tbe = (i + 1) * anglePerTooth - (centerAngle - leftProfile[0].theta); 
-              if (Math.abs(tbe - tbs) < 1e-4) tbe = tbs + 1e-4; 
-              
-              for (let a = 0; a <= arcSteps; a++) {
-                  const theta = tbs + (tbe - tbs) * (a / arcSteps);
-                  botPts.push({ x: rBot * Math.cos(theta), y: rBot * Math.sin(theta) });
-              }
-              if (epsilon > 0) botPts = simplifyRDP(botPts, epsilon);
-
-              segments.push(leftPts);
-              segments.push(topPts);
-              segments.push(rightPts);
-              segments.push(botPts);
-            }
-
-            for (let i = 0; i < segments.length - 1; i++) {
-                segments[i+1][0] = segments[i][segments[i].length - 1];
-            }
-            segments[0][0] = segments[segments.length - 1][segments[segments.length - 1].length - 1];
-
-            return segments;
-          }, [pressureAngle, clearance, backlash]);
-
-          const flattenSegments = (segments) => {
-              const flat = [];
-              segments.forEach(seg => { for(let i=0; i<seg.length-1; i++) flat.push(seg[i]); });
-              return flat;
-          };
-
-          // TIER 1 OpenSource: Simplified 3D generation without complex matrices
-          const buildBasic3DGeometry = useCallback((points, holeRadius, isInternal, pitchRad, tx, ty) => {
-            let vertices = [];
-            let faces = [];
-            const zHeights = [0, gearThickness];
-            const slices = 1;
-            const N = points.length;
-
-            let maxProfileR = 0;
-            let minProfileR = Infinity;
-            
-            const profile2D = points.map(p => {
-                const pr = Math.hypot(p.x, p.y);
-                const ptAngle = Math.atan2(p.y, p.x);
-                if (pr > maxProfileR) maxProfileR = pr;
-                if (pr < minProfileR) minProfileR = pr;
-                return { x: p.x, y: p.y, r: pr, angle: ptAngle };
+        function updateDOM() {
+            document.querySelectorAll('[data-display]').forEach(el => {
+                const key = el.getAttribute('data-display');
+                let val = Derived[key] !== undefined ? Derived[key] : State[key];
+                if (val === undefined && key === 'gearRatio') val = getGearRatioText();
+                const fmt = el.getAttribute('data-format');
+                if (fmt === 'fixed2') val = Number(val).toFixed(2); if (fmt === 'fixed3') val = Number(val).toFixed(3);
+                el.textContent = val;
             });
 
-            for (let s = 0; s <= slices; s++) {
-                const z = zHeights[s];
-                
-                let currentOuterLimit, currentInnerLimit;
-                if (isInternal) {
-                    currentOuterLimit = pitchRad + ringThickness;
-                    currentInnerLimit = minProfileR;
-                } else {
-                    currentInnerLimit = Math.max(0.01, holeRadius);
-                    currentOuterLimit = maxProfileR;
+            document.querySelectorAll('[data-bind]').forEach(el => {
+                const key = el.getAttribute('data-bind');
+                if (el.type === 'checkbox') el.checked = !!State[key]; else if (el.value != State[key]) el.value = State[key];
+            });
+
+            const updateRange = (id, validArr, stateKey) => {
+                const el = document.getElementById(id);
+                if(el) { el.max = Math.max(0, validArr.length - 1); el.value = validArr.indexOf(State[stateKey]) !== -1 ? validArr.indexOf(State[stateKey]) : 0; el.disabled = validArr.length <= 1; el.style.opacity = validArr.length <= 1 ? '0.5' : '1'; }
+            };
+            updateRange('range-sunTeeth', Derived.validS, 'sunTeeth'); updateRange('range-planetTeeth', Derived.validP, 'planetTeeth'); updateRange('range-numPlanets', Derived.validN, 'numPlanets');
+
+            document.querySelectorAll('.btn-toggle-part').forEach(btn => btn.classList.toggle('active', btn.dataset.val === State.fixedPart));
+            document.querySelectorAll('.btn-export-target').forEach(btn => btn.classList.toggle('active', btn.dataset.val === (State.exportTarget || 'all')));
+
+            const btnPlay = document.getElementById('btn-play');
+            if (btnPlay) btnPlay.innerHTML = State.isPlaying 
+                ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-accent"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg><span class="text-sm font-bold tracking-wider">PAUSE</span>`
+                : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-carrier"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><span class="text-sm font-bold tracking-wider">PLAY</span>`;
+        }
+
+        function setupDOMListeners() {
+            document.querySelectorAll('[data-bind]').forEach(el => {
+                const key = el.getAttribute('data-bind');
+                el.addEventListener('input', (e) => { let val = el.type === 'checkbox' ? e.target.checked : parseFloat(e.target.value); if (!isNaN(val) || el.type === 'checkbox') State[key] = val; });
+                if (el.type === 'number' && ['sunTeeth', 'planetTeeth', 'numPlanets'].includes(key)) {
+                    el.addEventListener('blur', (e) => {
+                        let val = parseFloat(e.target.value) || 0; const vArr = key === 'sunTeeth' ? Derived.validS : (key === 'planetTeeth' ? Derived.validP : Derived.validN);
+                        if (!vArr.includes(val)) val = vArr.reduce((p, c) => Math.abs(c - val) < Math.abs(p - val) ? c : p); State[key] = val;
+                    });
+                }
+            });
+            const bindRange = (id, validArrKey, stateKey) => { const el = document.getElementById(id); if(el) el.addEventListener('input', (e) => { State[stateKey] = Derived[validArrKey][parseInt(e.target.value)]; }); }
+            bindRange('range-sunTeeth', 'validS', 'sunTeeth'); bindRange('range-planetTeeth', 'validP', 'planetTeeth'); bindRange('range-numPlanets', 'validN', 'numPlanets');
+        }
+
+        function togglePanel(id, forceClose) {
+            const p = document.getElementById(id), btn = document.getElementById(id.replace('panel', 'toggle') + '-container');
+            if (forceClose || !p.classList.contains('closed')) { p.classList.add('closed'); btn.style.opacity = '1'; btn.style.pointerEvents = 'auto'; } 
+            else { p.classList.remove('closed'); btn.style.opacity = '0'; btn.style.pointerEvents = 'none'; }
+        }
+        function togglePlay() { State.isPlaying = !State.isPlaying; }
+        function setFixedPart(p) { State.fixedPart = p; }
+        function setExportTarget(t) { State.exportTarget = t; }
+
+        function exportJSON() {
+            const keys = Object.keys(window.localStorage).filter(k => k.startsWith('pg_')), settings = {};
+            keys.forEach(k => settings[k] = JSON.parse(window.localStorage.getItem(k)));
+            const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `planetary-gear-profile.json`; a.click(); URL.revokeObjectURL(url);
+        }
+        function importJSON(e) {
+            const file = e.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => { try { const settings = JSON.parse(event.target.result); Object.keys(settings).forEach(k => { if (k.startsWith('pg_')) window.localStorage.setItem(k, JSON.stringify(settings[k])); }); window.location.reload(); } catch(err) { alert("Invalid profile file."); } };
+            reader.readAsText(file);
+        }
+        function resetDefaults() { if (window.confirm("Reset all settings to original defaults?")) { Object.keys(window.localStorage).forEach(k => { if (k.startsWith('pg_')) window.localStorage.removeItem(k); }); window.location.reload(); } }
+
+        function generateGearSegments(teeth, pitchRadius, mod, isInternal, profileShift = 0, isPreview = false, resolution = 'High', forceSmooth = false) {
+            const baseRadius = pitchRadius * Math.cos(Derived.paRad);
+            const addendum = mod * (1 + profileShift), dedendum = mod * (1 + State.clearance - profileShift);
+            const tipRadius = isInternal ? pitchRadius - mod * (1 - profileShift) : pitchRadius + addendum;
+            const rootRadius = isInternal ? pitchRadius + mod * (1 + State.clearance + profileShift) : pitchRadius - dedendum;
+            const anglePerTooth = (Math.PI * 2) / teeth;
+            const halfToothAngleAtPitch = (Math.PI / 2 + 2 * profileShift * Math.tan(Derived.paRad)) / teeth;
+            const backlashAngle = State.backlash / (2 * pitchRadius);
+
+            const inv = (r) => { if (r <= baseRadius) return 0; const alpha = Math.acos(baseRadius / r); return Math.tan(alpha) - alpha; };
+            const pitchInv = inv(pitchRadius);
+
+            let epsilon = 0, steps = 20, arcSteps = 8; 
+            if (isPreview) { steps = 4; arcSteps = 1; epsilon = 0.3; }
+
+            let segments = []; 
+            for (let i = 0; i < teeth; i++) {
+                let centerAngle = i * anglePerTooth, leftProfile = [], rightProfile = [];
+                const rInner = isInternal ? tipRadius : rootRadius, rOuter = isInternal ? rootRadius : tipRadius;
+
+                for (let j = 0; j <= steps; j++) {
+                    const r = rInner + (rOuter - rInner) * (0.5 - 0.5 * Math.cos((j / steps) * Math.PI));
+                    const thetaInv = inv(Math.max(r, baseRadius));
+                    let angleOffset = halfToothAngleAtPitch + pitchInv - thetaInv;
+                    if (isInternal) angleOffset += backlashAngle; else angleOffset -= backlashAngle;
+                    angleOffset = Math.max(0.0001, angleOffset); 
+                    leftProfile.push({ r, theta: centerAngle - angleOffset });
+                    rightProfile.unshift({ r, theta: centerAngle + angleOffset });
                 }
 
-                const zOffset = z - gearThickness/2;
+                let leftPts = leftProfile.map(p => ({ x: p.r * Math.cos(p.theta), y: p.r * Math.sin(p.theta) }));
+                if (epsilon > 0) leftPts = simplifyRDP(leftPts, epsilon);
+                
+                let topPts = [];
+                const tts = leftProfile[leftProfile.length - 1].theta; let tte = rightProfile[0].theta; if (Math.abs(tte - tts) < 1e-4) tte = tts + 1e-4; 
+                for (let a = 0; a <= arcSteps; a++) topPts.push({ x: rOuter * Math.cos(tts + (tte - tts) * (a / arcSteps)), y: rOuter * Math.sin(tts + (tte - tts) * (a / arcSteps)) });
+                if (epsilon > 0) topPts = simplifyRDP(topPts, epsilon);
+
+                let rightPts = rightProfile.map(p => ({ x: p.r * Math.cos(p.theta), y: p.r * Math.sin(p.theta) }));
+                if (epsilon > 0) rightPts = simplifyRDP(rightPts, epsilon);
+
+                let botPts = [];
+                const tbs = rightProfile[rightProfile.length - 1].theta; let tbe = (i + 1) * anglePerTooth - (centerAngle - leftProfile[0].theta); if (Math.abs(tbe - tbs) < 1e-4) tbe = tbs + 1e-4; 
+                for (let a = 0; a <= arcSteps; a++) botPts.push({ x: rInner * Math.cos(tbs + (tbe - tbs) * (a / arcSteps)), y: rInner * Math.sin(tbs + (tbe - tbs) * (a / arcSteps)) });
+                if (epsilon > 0) botPts = simplifyRDP(botPts, epsilon);
+
+                segments.push(leftPts); segments.push(topPts); segments.push(rightPts); segments.push(botPts);
+            }
+            for (let i = 0; i < segments.length - 1; i++) segments[i+1][0] = segments[i][segments[i].length - 1];
+            segments[0][0] = segments[segments.length - 1][segments[segments.length - 1].length - 1];
+            return segments;
+        }
+
+        const flattenSegments = (segments) => { const flat = []; segments.forEach(seg => { for(let i=0; i<seg.length-1; i++) flat.push(seg[i]); }); return flat; };
+
+        function buildBasic3DGeometry(points, holeRadius, isInternal, pitchRad, tx, ty) {
+            let vertices = [], faces = [];
+            const N = points.length;
+            let maxProfileR = 0, minProfileR = Infinity;
+            const profile2D = points.map(p => { const pr = Math.hypot(p.x, p.y); if (pr > maxProfileR) maxProfileR = pr; if (pr < minProfileR) minProfileR = pr; return { x: p.x, y: p.y, r: pr, angle: Math.atan2(p.y, p.x) }; });
+
+            for (let s = 0; s <= 1; s++) {
+                const z = s === 0 ? 0 : State.gearThickness;
+                let currentOuterLimit, currentInnerLimit;
+                if (isInternal) { currentOuterLimit = pitchRad + State.ringThickness; currentInnerLimit = minProfileR; } 
+                else { currentInnerLimit = Math.max(0.01, holeRadius); currentOuterLimit = maxProfileR; }
+                const zOffset = z - State.gearThickness/2;
 
                 for(let i = 0; i < N; i++) {
-                    const pt = profile2D[i];
-                    let ix, iy;
-                    if (isInternal) {
-                        const R_clamped = Math.max(currentInnerLimit, Math.min(pt.r, currentOuterLimit));
-                        const scale = pt.r === 0 ? 1 : R_clamped / pt.r;
-                        ix = pt.x * scale; iy = pt.y * scale;
-                    } else {
-                        ix = currentInnerLimit * Math.cos(pt.angle);
-                        iy = currentInnerLimit * Math.sin(pt.angle);
-                    }
+                    const pt = profile2D[i]; let ix, iy;
+                    if (isInternal) { const R_clamped = Math.max(currentInnerLimit, Math.min(pt.r, currentOuterLimit)); const scale = pt.r === 0 ? 1 : R_clamped / pt.r; ix = pt.x * scale; iy = pt.y * scale; } 
+                    else { ix = currentInnerLimit * Math.cos(pt.angle); iy = currentInnerLimit * Math.sin(pt.angle); }
                     vertices.push({x: ix + tx, y: iy + ty, z: zOffset});
                 }
-
                 for(let i = 0; i < N; i++) {
-                    const pt = profile2D[i];
-                    let ox, oy;
-                    if (isInternal) {
-                        ox = currentOuterLimit * Math.cos(pt.angle);
-                        oy = currentOuterLimit * Math.sin(pt.angle);
-                    } else {
-                        const maxR_safe = Math.max(currentOuterLimit, currentInnerLimit);
-                        const R_clamped = Math.max(currentInnerLimit, Math.min(pt.r, maxR_safe));
-                        const scale = pt.r === 0 ? 1 : R_clamped / pt.r;
-                        ox = pt.x * scale; oy = pt.y * scale;
-                    }
+                    const pt = profile2D[i]; let ox, oy;
+                    if (isInternal) { ox = currentOuterLimit * Math.cos(pt.angle); oy = currentOuterLimit * Math.sin(pt.angle); } 
+                    else { const maxR_safe = Math.max(currentOuterLimit, currentInnerLimit); const R_clamped = Math.max(currentInnerLimit, Math.min(pt.r, maxR_safe)); const scale = pt.r === 0 ? 1 : R_clamped / pt.r; ox = pt.x * scale; oy = pt.y * scale; }
                     vertices.push({x: ox + tx, y: oy + ty, z: zOffset});
                 }
             }
 
-            const pushTriQuad = (a, b, c, d) => {
-                faces.push([a, b, c]);
-                faces.push([a, c, d]);
-            };
-
-            const botIn = 0; const botOut = N;
-            for (let i = 0; i < N; i++) {
-                const next_i = (i + 1) % N;
-                pushTriQuad(botIn + i, botIn + next_i, botOut + next_i, botOut + i);
-            }
-
-            const topIn = 2 * N; const topOut = 2 * N + N;
-            for (let i = 0; i < N; i++) {
-                const next_i = (i + 1) % N;
-                pushTriQuad(topIn + i, topOut + i, topOut + next_i, topIn + next_i);
-            }
-
-            const currIn = 0; const currOut = N;
-            const nextIn = 2 * N; const nextOut = 2 * N + N;
-            for (let i = 0; i < N; i++) {
-                const next_i = (i + 1) % N;
-                pushTriQuad(currIn + i, nextIn + i, nextIn + next_i, currIn + next_i);
-                pushTriQuad(currOut + i, currOut + next_i, nextOut + next_i, nextOut + i);
-            }
-            
+            const pushTriQuad = (a, b, c, d) => { faces.push([a, b, c]); faces.push([a, c, d]); };
+            const botIn = 0, botOut = N; for (let i = 0; i < N; i++) pushTriQuad(botIn + i, botIn + ((i + 1) % N), botOut + ((i + 1) % N), botOut + i);
+            const topIn = 2 * N, topOut = 2 * N + N; for (let i = 0; i < N; i++) pushTriQuad(topIn + i, topOut + i, topOut + ((i + 1) % N), topIn + ((i + 1) % N));
+            const currIn = 0, currOut = N, nextIn = 2 * N, nextOut = 2 * N + N;
+            for (let i = 0; i < N; i++) { const next_i = (i + 1) % N; pushTriQuad(currIn + i, nextIn + i, nextIn + next_i, currIn + next_i); pushTriQuad(currOut + i, currOut + next_i, nextOut + next_i, nextOut + i); }
             return { vertices, faces };
-          }, [gearThickness, ringThickness]);
+        }
 
-          const createThreeBufferGeometry = useCallback((geomData) => {
-              const { vertices, faces } = geomData;
-              const geometry = new THREE.BufferGeometry();
-              const posArray = [];
-              faces.forEach(f => {
-                  const v0 = vertices[f[0]]; const v1 = vertices[f[1]]; const v2 = vertices[f[2]];
-                  posArray.push(v0.x, v0.y, v0.z, v1.x, v1.y, v1.z, v2.x, v2.y, v2.z);
-              });
-              geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posArray), 3));
-              geometry.computeVertexNormals();
-              return geometry;
-          }, []);
+        // --- EXPORTERS ---
+        function downloadSVG() {
+            const target = State.exportTarget || 'all';
+            const pIsEven = State.planetTeeth % 2 === 0;
+            const phi_p = pIsEven ? Math.PI / State.planetTeeth : 0, phi_r = pIsEven ? Math.PI / Derived.ringTeeth : 0;
 
-          const updateProjection = useCallback((w, h) => {
-              if (cameraRef.current) {
-                  cameraRef.current.aspect = w / h;
-                  if (panOffset.current.x !== 0 || panOffset.current.y !== 0) {
-                      cameraRef.current.setViewOffset(w, h, panOffset.current.x, panOffset.current.y, w, h);
-                  } else {
-                      cameraRef.current.clearViewOffset();
-                  }
-                  cameraRef.current.updateProjectionMatrix();
-              }
-          }, []);
+            let svgSize;
+            if (target === 'sun') svgSize = Derived.sun_da + 20;
+            else if (target === 'planet') svgSize = Derived.planet_da + 20;
+            else svgSize = (Derived.r_r + State.ringThickness) * 2 + 20;
 
-          const adjustCameraDistance = useCallback(() => {
-              if (!cameraRef.current || !controlsRef.current) return;
-              
-              const outerRad = r_r + ringThickness + (moduleSize * 2);
-              const aspect = cameraRef.current.aspect;
-              const fovRad = cameraRef.current.fov * (Math.PI / 180);
-              
-              const hFovRad = 2 * Math.atan(Math.tan(fovRad / 2) * aspect);
-              const minFov = Math.min(fovRad, hFovRad);
-              
-              const targetDistance = outerRad / Math.sin(minFov / 2);
-              
-              const currentPos = cameraRef.current.position.clone();
-              const target = controlsRef.current.target.clone();
-              const direction = currentPos.sub(target).normalize();
-              
-              if (direction.lengthSq() < 0.01) {
-                  direction.set(0, -1, 1).normalize();
-              }
-              
-              const newPos = target.add(direction.multiplyScalar(targetDistance));
-              cameraRef.current.position.copy(newPos);
-              controlsRef.current.update();
-              renderRequestRef.current = true;
-          }, [r_r, ringThickness, moduleSize]);
-
-          const resetCamera = useCallback(() => {
-              if (cameraRef.current && controlsRef.current && mountRef.current) {
-                  const outerRad = r_r + ringThickness + (moduleSize * 2);
-                  const aspect = cameraRef.current.aspect;
-                  const fovRad = cameraRef.current.fov * (Math.PI / 180);
-                  
-                  const hFovRad = 2 * Math.atan(Math.tan(fovRad / 2) * aspect);
-                  const minFov = Math.min(fovRad, hFovRad);
-                  
-                  const distance = outerRad / Math.sin(minFov / 2);
-                  const offset = distance / Math.sqrt(2); 
-
-                  cameraRef.current.position.set(0, -offset, offset);
-                  controlsRef.current.target.set(0, 0, 0); 
-                  controlsRef.current.update();
-
-                  panOffset.current.x = 0;
-                  panOffset.current.y = 0;
-                  const w = mountRef.current.clientWidth;
-                  const h = mountRef.current.clientHeight;
-                  updateProjection(w, h);
-                  
-                  renderRequestRef.current = true;
-              }
-          }, [r_r, ringThickness, moduleSize, updateProjection]);
-
-          // --- Initialize ThreeJS Environment ---
-          useEffect(() => {
-              const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-              renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-              mountRef.current.appendChild(renderer.domElement);
-              rendererRef.current = renderer;
-
-              const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
-              camera.up.set(0, 0, 1); 
-              cameraRef.current = camera;
-
-              const controls = new THREE.OrbitControls(camera, renderer.domElement);
-              controls.enableDamping = true;
-              controls.dampingFactor = 0.05;
-              controls.enablePan = false; 
-              controls.addEventListener('change', () => { renderRequestRef.current = true; });
-              controlsRef.current = controls;
-
-              // --- CUSTOM 2D PANNING ---
-              const dom = renderer.domElement;
-              let isPanning = false;
-              let lastMouse = { x: 0, y: 0 };
-              
-              const onPointerDown = (e) => {
-                  if (e.button === 2) { 
-                      e.preventDefault();
-                      isPanning = true;
-                      lastMouse.x = e.clientX;
-                      lastMouse.y = e.clientY;
-                      dom.setPointerCapture(e.pointerId);
-                  }
-              };
-              
-              const onPointerMove = (e) => {
-                  if (isPanning && mountRef.current) {
-                      e.preventDefault();
-                      const dx = e.clientX - lastMouse.x;
-                      const dy = e.clientY - lastMouse.y;
-                      lastMouse.x = e.clientX;
-                      lastMouse.y = e.clientY;
-                      
-                      panOffset.current.x -= dx;
-                      panOffset.current.y -= dy;
-                      
-                      const w = mountRef.current.clientWidth;
-                      const h = mountRef.current.clientHeight;
-                      updateProjection(w, h);
-                      renderRequestRef.current = true;
-                  }
-              };
-              
-              const onPointerUp = (e) => { 
-                  if (e.button === 2 && isPanning) {
-                      e.preventDefault();
-                      isPanning = false; 
-                      dom.releasePointerCapture(e.pointerId);
-                  }
-              };
-              
-              const onContextMenu = (e) => e.preventDefault();
-
-              dom.addEventListener('pointerdown', onPointerDown);
-              dom.addEventListener('pointermove', onPointerMove);
-              dom.addEventListener('pointerup', onPointerUp);
-              dom.addEventListener('contextmenu', onContextMenu);
-
-              const scene = sceneRef.current;
-              
-              const oldLights = scene.children.filter(c => c.isLight);
-              oldLights.forEach(l => scene.remove(l));
-
-              const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-              scene.add(ambientLight);
-
-              const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-              dirLight.position.set(100, -100, 200);
-              scene.add(dirLight);
-              
-              const dirLight2 = new THREE.DirectionalLight(0x90b0d0, 0.4);
-              dirLight2.position.set(-100, 100, -100);
-              scene.add(dirLight2);
-
-              const resizeObserver = new ResizeObserver((entries) => {
-                  if (!mountRef.current || !rendererRef.current || !cameraRef.current) return;
-                  const { width, height } = entries[0].contentRect;
-                  rendererRef.current.setSize(width, height, false);
-                  updateProjection(width, height);
-                  
-                  if (!initializedCamera.current) {
-                      resetCamera();
-                      initializedCamera.current = true;
-                  }
-                  renderRequestRef.current = true;
-              });
-              
-              resizeObserver.observe(mountRef.current);
-
-              return () => {
-                  resizeObserver.disconnect();
-                  dom.removeEventListener('pointerdown', onPointerDown);
-                  dom.removeEventListener('pointermove', onPointerMove);
-                  window.removeEventListener('pointerup', onPointerUp);
-                  dom.removeEventListener('contextmenu', onContextMenu);
-
-                  if (mountRef.current && rendererRef.current) {
-                      mountRef.current.removeChild(rendererRef.current.domElement);
-                  }
-                  if (rendererRef.current) rendererRef.current.dispose();
-              };
-          }, [resetCamera, updateProjection]);
-
-          // --- Rebuild 3D Meshes on param change ---
-          useEffect(() => {
-              const scene = sceneRef.current;
-              
-              Object.values(meshesRef.current).forEach(mesh => {
-                  if (!mesh) return;
-                  if (Array.isArray(mesh)) {
-                      mesh.forEach(m => { if (m) { scene.remove(m); disposeNode(m); } });
-                  } else {
-                      scene.remove(mesh); disposeNode(mesh);
-                  }
-              });
-              meshesRef.current = {};
-
-              const pIsEven = planetTeeth % 2 === 0;
-              const phi_p = pIsEven ? Math.PI / planetTeeth : 0;
-              const phi_r = pIsEven ? Math.PI / ringTeeth : 0;
-
-              const mats = materialsRef.current;
-
-              const sunPts = flattenSegments(generateGearSegments(sunTeeth, r_s, moduleSize, false, sunShift, true));
-              const sunGeom = createThreeBufferGeometry(buildBasic3DGeometry(sunPts, Math.max(0.01, safeSunHole / 2), false, r_s, 0, 0));
-              const sunMesh = new THREE.Mesh(sunGeom, mats.sun);
-              scene.add(sunMesh);
-              meshesRef.current.sun = sunMesh;
-
-              const ringPts = flattenSegments(generateGearSegments(ringTeeth, r_r, moduleSize, true, ringShift, true));
-              const ringGeom = createThreeBufferGeometry(buildBasic3DGeometry(ringPts, r_r + ringThickness, true, r_r, 0, 0));
-              const ringMesh = new THREE.Mesh(ringGeom, mats.ring);
-              scene.add(ringMesh);
-              meshesRef.current.ring = ringMesh;
-
-              meshesRef.current.planets = [];
-              const planetPts = flattenSegments(generateGearSegments(planetTeeth, r_p, moduleSize, false, planetShift, true));
-              const basePlanetGeom = createThreeBufferGeometry(buildBasic3DGeometry(planetPts, Math.max(0.01, safePlanetHole / 2), false, r_p, 0, 0));
-
-              for(let i=0; i<numPlanets; i++) {
-                  const alpha_i = i * 2 * Math.PI / numPlanets;
-                  const theta_pi = alpha_i + (0 - alpha_i) * (-sunTeeth / planetTeeth) + phi_p;
-                  const px = r_c * Math.cos(alpha_i);
-                  const py = r_c * Math.sin(alpha_i);
-
-                  const pMesh = new THREE.Mesh(basePlanetGeom, mats.planets[i % mats.planets.length]);
-                  pMesh.position.set(px, py, 0);
-                  pMesh.rotation.z = theta_pi;
-                  
-                  scene.add(pMesh);
-                  meshesRef.current.planets.push(pMesh);
-              }
-
-              if (showCarrier) {
-                  const cGroup = new THREE.Group();
-                  const cGeom = new THREE.CylinderGeometry(r_c + moduleSize, r_c + moduleSize, 2, 64);
-                  const cMesh = new THREE.Mesh(cGeom, mats.carrier);
-                  cMesh.rotation.x = Math.PI / 2;
-                  cGroup.add(cMesh);
-                  scene.add(cGroup);
-                  meshesRef.current.carrier = cGroup;
-              }
-
-              adjustCameraDistance();
-              renderRequestRef.current = true; 
-          }, [sunTeeth, planetTeeth, numPlanets, moduleSize, r_s, r_p, r_r, r_c, createThreeBufferGeometry, generateGearSegments, flattenSegments, buildBasic3DGeometry, showCarrier, safeSunHole, safePlanetHole, ringThickness, adjustCameraDistance, sunShift, planetShift, ringShift]);
-
-          useEffect(() => {
-            let frameId;
-            const animate = () => {
-                frameId = requestAnimationFrame(animate);
-                
-                if (isPlayingRef.current) {
-                    timeRef.current += 1;
-                    renderRequestRef.current = true;
-                }
-                
-                if (controlsRef.current) controlsRef.current.update();
-
-                if (renderRequestRef.current) {
-                    const { w_s, w_c, w_r } = calculateSpeedsRef.current();
-                    const t = timeRef.current;
-                    const theta_s = w_s * t;
-                    const theta_c = w_c * t;
-                    const theta_r = w_r * t;
-
-                    const pIsEven = planetTeeth % 2 === 0;
-                    const phi_p = pIsEven ? Math.PI / planetTeeth : 0;
-                    const phi_r = pIsEven ? Math.PI / ringTeeth : 0; 
-
-                    const meshes = meshesRef.current;
-
-                    if (meshes.sun) meshes.sun.rotation.z = theta_s;
-                    if (meshes.ring) meshes.ring.rotation.z = theta_r + phi_r; 
-                    if (meshes.carrier) meshes.carrier.rotation.z = theta_c;
-                    
-                    if (meshes.planets) {
-                        meshes.planets.forEach((pMesh, i) => {
-                            if (!pMesh) return;
-                            const alpha_i = theta_c + i * 2 * Math.PI / numPlanets;
-                            const theta_pi = alpha_i + (theta_s - alpha_i) * (-sunTeeth / planetTeeth) + phi_p;
-                            pMesh.position.x = r_c * Math.cos(alpha_i);
-                            pMesh.position.y = r_c * Math.sin(alpha_i);
-                            pMesh.rotation.z = theta_pi;
-                        });
-                    }
-
-                    if (rendererRef.current && sceneRef.current && cameraRef.current) {
-                        rendererRef.current.render(sceneRef.current, cameraRef.current);
-                    }
-                    
-                    if (!isPlayingRef.current) renderRequestRef.current = false;
-                }
-            };
-            animate();
-            return () => cancelAnimationFrame(frameId);
-          }, [sunTeeth, planetTeeth, ringTeeth, numPlanets, r_c]);
-
-          // TIER 1 FEATURE: SVG Export
-          const downloadSVG = () => {
-            const pIsEven = planetTeeth % 2 === 0;
-            const phi_p = pIsEven ? Math.PI / planetTeeth : 0;
-            const phi_r = pIsEven ? Math.PI / ringTeeth : 0;
-
-            const svgSize = (r_r + ringThickness) * 2 + 20;
             const center = svgSize / 2;
+            let svgData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize}" height="${svgSize}"><g transform="translate(${center}, ${center})">`;
 
-            let svgData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize}" height="${svgSize}">
-              <g transform="translate(${center}, ${center})">`;
-
-            const ringPts = flattenSegments(generateGearSegments(ringTeeth, r_r, moduleSize, true, ringShift, false, 'High'));
-            const rPath = ringPts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + " Z";
-            const bRadius = r_r + ringThickness;
-            const rHole = ` M ${bRadius} 0 A ${bRadius} ${bRadius} 0 1 0 -${bRadius} 0 A ${bRadius} ${bRadius} 0 1 0 ${bRadius} 0`;
-            
-            svgData += `<g transform="rotate(${(phi_r * 180 / Math.PI)})">
-              <path d="${rPath + rHole}" fill="none" stroke="#EF4444" stroke-width="1.5" fill-rule="evenodd" />
-            </g>`;
-
-            for (let i = 0; i < numPlanets; i++) {
-              const alpha_i = i * 2 * Math.PI / numPlanets;
-              const theta_pi = alpha_i + (0 - alpha_i) * (-sunTeeth / planetTeeth) + phi_p;
-              const px = r_c * Math.cos(alpha_i);
-              const py = r_c * Math.sin(alpha_i);
-              
-              const pPts = flattenSegments(generateGearSegments(planetTeeth, r_p, moduleSize, false, planetShift, false, 'High'));
-              const pPath = pPts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + " Z";
-
-              svgData += `<g transform="translate(${px}, ${py}) rotate(${(theta_pi * 180 / Math.PI)})">
-                <path d="${pPath}" fill="none" stroke="#3B82F6" stroke-width="1.5" fill-rule="evenodd" />
-                <circle cx="0" cy="0" r="${Math.max(0.01, safePlanetHole / 2)}" fill="#000" />
-              </g>`;
+            if (target === 'all' || target === 'ring') {
+                const ringPts = flattenSegments(generateGearSegments(Derived.ringTeeth, Derived.r_r, State.moduleSize, true, State.ringShift, false, 'High'));
+                const rPath = ringPts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + " Z";
+                const bRadius = Derived.r_r + State.ringThickness;
+                const rot = target === 'all' ? phi_r * 180 / Math.PI : 0;
+                svgData += `<g transform="rotate(${rot})"><path d="${rPath} M ${bRadius} 0 A ${bRadius} ${bRadius} 0 1 0 -${bRadius} 0 A ${bRadius} ${bRadius} 0 1 0 ${bRadius} 0" fill="none" stroke="#EF4444" stroke-width="1.5" fill-rule="evenodd" /></g>`;
             }
 
-            const sPts = flattenSegments(generateGearSegments(sunTeeth, r_s, moduleSize, false, sunShift, false, 'High'));
-            const sPath = sPts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + " Z";
-            svgData += `<g><path d="${sPath}" fill="none" stroke="#F59E0B" stroke-width="1.5" fill-rule="evenodd" /><circle cx="0" cy="0" r="${Math.max(0.01, safeSunHole / 2)}" fill="#000" /></g>`;
+            if (target === 'all' || target === 'planet') {
+                const pPts = flattenSegments(generateGearSegments(State.planetTeeth, Derived.r_p, State.moduleSize, false, State.planetShift, false, 'High'));
+                const pPath = pPts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + " Z";
+                if (target === 'all') {
+                    for (let i = 0; i < State.numPlanets; i++) {
+                        const alpha_i = i * 2 * Math.PI / State.numPlanets;
+                        const px = Derived.r_c * Math.cos(alpha_i), py = Derived.r_c * Math.sin(alpha_i);
+                        const theta_pi = alpha_i + (0 - alpha_i) * (-State.sunTeeth / State.planetTeeth) + phi_p;
+                        svgData += `<g transform="translate(${px}, ${py}) rotate(${(theta_pi * 180 / Math.PI)})"><path d="${pPath}" fill="none" stroke="#3B82F6" stroke-width="1.5" fill-rule="evenodd" /><circle cx="0" cy="0" r="${Math.max(0.01, Derived.safePlanetHole / 2)}" fill="#000" /></g>`;
+                    }
+                } else svgData += `<g><path d="${pPath}" fill="none" stroke="#3B82F6" stroke-width="1.5" fill-rule="evenodd" /><circle cx="0" cy="0" r="${Math.max(0.01, Derived.safePlanetHole / 2)}" fill="#000" /></g>`;
+            }
 
-            if (showCarrier) {
-              for (let i = 0; i < numPlanets; i++) {
-                const alpha_i = i * 2 * Math.PI / numPlanets;
-                const px = r_c * Math.cos(alpha_i);
-                const py = r_c * Math.sin(alpha_i);
-                svgData += `<line x1="0" y1="0" x2="${px}" y2="${py}" stroke="${CARRIER_COLOR}" stroke-width="${moduleSize}" opacity="0.4" stroke-linecap="round"/>`;
-              }
+            if (target === 'all' || target === 'sun') {
+                const sPts = flattenSegments(generateGearSegments(State.sunTeeth, Derived.r_s, State.moduleSize, false, State.sunShift, false, 'High'));
+                const sPath = sPts.map((p, j) => `${j === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') + " Z";
+                svgData += `<g><path d="${sPath}" fill="none" stroke="#F59E0B" stroke-width="1.5" fill-rule="evenodd" /><circle cx="0" cy="0" r="${Math.max(0.01, Derived.safeSunHole / 2)}" fill="#000" /></g>`;
+            }
+
+            if (target === 'all' && State.showCarrier) {
+                for (let i = 0; i < State.numPlanets; i++) {
+                    svgData += `<line x1="0" y1="0" x2="${Derived.r_c * Math.cos(i * 2 * Math.PI / State.numPlanets)}" y2="${Derived.r_c * Math.sin(i * 2 * Math.PI / State.numPlanets)}" stroke="#10B981" stroke-width="${State.moduleSize}" opacity="0.4" stroke-linecap="round"/>`;
+                }
             }
 
             svgData += `</g></svg>`;
-
             const blob = new Blob([svgData], { type: 'image/svg+xml' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `planetary-gear-S${sunTeeth}-P${planetTeeth}.svg`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-          };
-
-          // TIER 1 FEATURE: 2D DXF Export (ASCII DXF R12)
-          const downloadDXF = () => {
-              const pIsEven = planetTeeth % 2 === 0;
-              const phi_p = pIsEven ? Math.PI / planetTeeth : 0;
-              const phi_r = pIsEven ? Math.PI / ringTeeth : 0;
-
-              let dxf = "0\nSECTION\n2\nENTITIES\n";
-
-              const addLine = (x1, y1, x2, y2, layer) => {
-                  dxf += `0\nLINE\n8\n${layer}\n10\n${x1.toFixed(4)}\n20\n${y1.toFixed(4)}\n11\n${x2.toFixed(4)}\n21\n${y2.toFixed(4)}\n`;
-              };
-              const addCircle = (cx, cy, r, layer) => {
-                  dxf += `0\nCIRCLE\n8\n${layer}\n10\n${cx.toFixed(4)}\n20\n${cy.toFixed(4)}\n40\n${r.toFixed(4)}\n`;
-              };
-
-              // Ring Gear (Rotated)
-              const ringPts = flattenSegments(generateGearSegments(ringTeeth, r_r, moduleSize, true, ringShift, false, 'High'));
-              const ringCasingR = r_r + ringThickness;
-              for(let i=0; i<ringPts.length-1; i++) {
-                  const x1 = ringPts[i].x * Math.cos(phi_r) - ringPts[i].y * Math.sin(phi_r);
-                  const y1 = ringPts[i].x * Math.sin(phi_r) + ringPts[i].y * Math.cos(phi_r);
-                  const x2 = ringPts[i+1].x * Math.cos(phi_r) - ringPts[i+1].y * Math.sin(phi_r);
-                  const y2 = ringPts[i+1].x * Math.sin(phi_r) + ringPts[i+1].y * Math.cos(phi_r);
-                  addLine(x1, y1, x2, y2, 'RingGear');
-              }
-              const xL = ringPts[ringPts.length-1].x * Math.cos(phi_r) - ringPts[ringPts.length-1].y * Math.sin(phi_r);
-              const yL = ringPts[ringPts.length-1].x * Math.sin(phi_r) + ringPts[ringPts.length-1].y * Math.cos(phi_r);
-              const xF = ringPts[0].x * Math.cos(phi_r) - ringPts[0].y * Math.sin(phi_r);
-              const yF = ringPts[0].x * Math.sin(phi_r) + ringPts[0].y * Math.cos(phi_r);
-              addLine(xL, yL, xF, yF, 'RingGear');
-              addCircle(0, 0, ringCasingR, 'RingCasing');
-
-              // Sun Gear
-              const sunPts = flattenSegments(generateGearSegments(sunTeeth, r_s, moduleSize, false, sunShift, false, 'High'));
-              for(let i=0; i<sunPts.length-1; i++) addLine(sunPts[i].x, sunPts[i].y, sunPts[i+1].x, sunPts[i+1].y, 'SunGear');
-              addLine(sunPts[sunPts.length-1].x, sunPts[sunPts.length-1].y, sunPts[0].x, sunPts[0].y, 'SunGear');
-              if(safeSunHole > 0) addCircle(0, 0, safeSunHole/2, 'SunHole');
-
-              // Planet Gears
-              for (let i = 0; i < numPlanets; i++) {
-                  const alpha_i = i * 2 * Math.PI / numPlanets;
-                  const theta_pi = alpha_i + (0 - alpha_i) * (-sunTeeth / planetTeeth) + phi_p;
-                  const px = r_c * Math.cos(alpha_i);
-                  const py = r_c * Math.sin(alpha_i);
-                  
-                  const pPts = flattenSegments(generateGearSegments(planetTeeth, r_p, moduleSize, false, planetShift, false, 'High'));
-                  for(let j=0; j<pPts.length-1; j++) {
-                      const x1 = pPts[j].x * Math.cos(theta_pi) - pPts[j].y * Math.sin(theta_pi) + px;
-                      const y1 = pPts[j].x * Math.sin(theta_pi) + pPts[j].y * Math.cos(theta_pi) + py;
-                      const x2 = pPts[j+1].x * Math.cos(theta_pi) - pPts[j+1].y * Math.sin(theta_pi) + px;
-                      const y2 = pPts[j+1].x * Math.sin(theta_pi) + pPts[j+1].y * Math.cos(theta_pi) + py;
-                      addLine(x1, y1, x2, y2, `PlanetGear_${i+1}`);
-                  }
-                  const pxL = pPts[pPts.length-1].x * Math.cos(theta_pi) - pPts[pPts.length-1].y * Math.sin(theta_pi) + px;
-                  const pyL = pPts[pPts.length-1].x * Math.sin(theta_pi) + pPts[pPts.length-1].y * Math.cos(theta_pi) + py;
-                  const pxF = pPts[0].x * Math.cos(theta_pi) - pPts[0].y * Math.sin(theta_pi) + px;
-                  const pyF = pPts[0].x * Math.sin(theta_pi) + pPts[0].y * Math.cos(theta_pi) + py;
-                  addLine(pxL, pyL, pxF, pyF, `PlanetGear_${i+1}`);
-
-                  if(safePlanetHole > 0) addCircle(px, py, safePlanetHole/2, `PlanetHole_${i+1}`);
-              }
-
-              dxf += "0\nENDSEC\n0\nEOF\n";
-
-              const blob = new Blob([dxf], { type: 'application/dxf' });
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `planetary-gear-2D-S${sunTeeth}-P${planetTeeth}.dxf`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-          };
-
-          return (
-            <div className="relative w-full h-[100dvh] bg-[#0b0f19] text-slate-200 font-sans overflow-hidden">
-              
-              {/* CANVAS CONTAINER */}
-              <div ref={mountRef} className="absolute inset-0 z-0 outline-none" style={{ touchAction: 'none' }} />
-
-              {/* FLOATING TOP TOGGLES */}
-              <div className={`absolute top-4 left-4 z-10 transition-opacity duration-300 ${leftOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                  <button onClick={() => setLeftOpen(true)} className="flex items-center gap-2 p-3 bg-slate-900/80 hover:bg-slate-800 backdrop-blur text-white rounded-lg shadow-lg border border-slate-700 transition-colors">
-                      <Settings className="w-5 h-5 text-emerald-400" />
-                      <span className="text-sm font-bold tracking-wider hidden sm:inline">CONTROLS</span>
-                  </button>
-              </div>
-
-              <div className={`absolute top-4 right-4 z-10 transition-opacity duration-300 ${rightOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                  <button onClick={() => setRightOpen(true)} className="flex items-center gap-2 p-3 bg-slate-900/80 hover:bg-slate-800 backdrop-blur text-white rounded-lg shadow-lg border border-slate-700 transition-colors">
-                      <span className="text-sm font-bold tracking-wider hidden sm:inline">SPECS & UPGRADES</span>
-                      <ListTree className="w-5 h-5 text-indigo-400" />
-                  </button>
-              </div>
-
-              {/* FLOATING TOP-CENTER BADGES */}
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-0 flex-col items-center gap-2 pointer-events-none hidden md:flex">
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 rounded-full backdrop-blur shadow-lg">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span className="text-[11px] font-bold uppercase tracking-wider">OpenSource Community Edition</span>
-                  </div>
-                  <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900/60 border border-slate-700 text-slate-300 rounded-full backdrop-blur shadow-lg">
-                      <MousePointer2 className="w-3.5 h-3.5" />
-                      <span className="text-[11px] font-bold uppercase tracking-wider">Drag to Rotate • Scroll to Zoom • Right-Click Pan</span>
-                  </div>
-              </div>
-
-              {/* FLOATING BOTTOM TOOLBAR */}
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex flex-col sm:flex-row items-center gap-3 w-full px-4 pointer-events-none justify-center">
-                  <div className="pointer-events-auto flex gap-2">
-                      <button onClick={() => setIsPlaying(!isPlaying)} className="flex items-center gap-2 px-4 py-3 bg-slate-900/90 hover:bg-slate-800 backdrop-blur text-white rounded-xl shadow-xl transition-colors border border-slate-700">
-                          {isPlaying ? <Pause className="w-5 h-5 text-amber-400" /> : <Play className="w-5 h-5 text-emerald-400" />}
-                          <span className="text-sm font-bold tracking-wider">{isPlaying ? 'PAUSE' : 'PLAY'}</span>
-                      </button>
-                      <button onClick={resetCamera} title="Recenter Camera" className="flex items-center gap-2 px-4 py-3 bg-slate-900/90 hover:bg-slate-800 backdrop-blur text-white rounded-xl shadow-xl transition-colors border border-slate-700">
-                          <Focus className="w-5 h-5 text-sky-400" />
-                      </button>
-                  </div>
-                  
-                  {/* TIER 1 - 2D ONLY EXPORTS */}
-                  <div className="pointer-events-auto flex bg-emerald-900/90 backdrop-blur rounded-xl shadow-xl divide-x divide-emerald-700/50 border border-emerald-500/50 overflow-hidden">
-                      <button onClick={downloadSVG} className="flex items-center gap-2 px-6 py-3 transition-colors hover:bg-emerald-700 text-white" title="Export 2D Vector (SVG)">
-                          <Download className="w-5 h-5" /><span className="text-sm font-bold tracking-widest hidden xl:inline">EXPORT SVG</span>
-                      </button>
-                      <button onClick={downloadDXF} className="flex items-center gap-2 px-6 py-3 transition-colors hover:bg-emerald-600 text-white bg-emerald-800" title="Export 2D CAD (DXF)">
-                          <PenTool className="w-5 h-5" /><span className="text-sm font-bold tracking-widest hidden xl:inline">EXPORT DXF</span>
-                      </button>
-                  </div>
-              </div>
-
-              {/* LEFT PANEL */}
-              <div className={`absolute top-0 left-0 bottom-0 w-[340px] max-w-[100vw] bg-slate-900/95 backdrop-blur-xl border-r border-slate-800 flex flex-col z-30 transition-transform duration-300 shadow-2xl ${leftOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                <div className="p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-3">
-                    <Settings className="text-emerald-400 w-6 h-6" />
-                    <h1 className="text-[17px] font-bold tracking-tight text-white italic">PLANETARY GEAR ENGINE</h1>
-                  </div>
-                  <button onClick={() => setLeftOpen(false)} className="p-1 text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-md">
-                      <XIcon className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="p-4 flex-1 overflow-y-auto">
-                  <Panel title="⚙️ Kinematic Precision" defaultOpen={true}>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <label className="text-sm text-slate-300 font-medium">Sun Teeth (S)</label>
-                          <NumberInput value={sunTeeth} onChange={setSunTeeth} validArray={validS} colorClass="text-amber-400" />
-                        </div>
-                        <input type="range" min="0" max={Math.max(0, validS.length - 1)} step="1" value={validS.indexOf(sunTeeth) !== -1 ? validS.indexOf(sunTeeth) : 0} onChange={(e) => setSunTeeth(validS[parseInt(e.target.value)])} disabled={validS.length <= 1} className={`w-full accent-amber-500 mt-2 ${validS.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <label className="text-sm text-slate-300 font-medium">Planet Teeth (P)</label>
-                          <NumberInput value={planetTeeth} onChange={setPlanetTeeth} validArray={validP} colorClass="text-blue-400" />
-                        </div>
-                        <input type="range" min="0" max={Math.max(0, validP.length - 1)} step="1" value={validP.indexOf(planetTeeth) !== -1 ? validP.indexOf(planetTeeth) : 0} onChange={(e) => setPlanetTeeth(validP[parseInt(e.target.value)])} disabled={validP.length <= 1} className={`w-full accent-blue-500 mt-2 ${validP.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <label className="text-sm text-slate-300 font-medium">Num Planets</label>
-                          <NumberInput value={numPlanets} onChange={setNumPlanets} validArray={validN} colorClass="text-emerald-400" />
-                        </div>
-                        <input type="range" min="0" max={Math.max(0, validN.length - 1)} step="1" value={validN.indexOf(numPlanets) !== -1 ? validN.indexOf(numPlanets) : 0} onChange={(e) => setNumPlanets(validN[parseInt(e.target.value)])} disabled={validN.length <= 1} className={`w-full accent-emerald-500 mt-2 ${validN.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''}`} />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <label className="text-sm text-slate-300 font-medium">Module (Size)</label>
-                          <NumberInput value={moduleSize} onChange={setModuleSize} min={1} max={10} step={0.1} colorClass="text-purple-400" />
-                        </div>
-                        <input type="range" min="1" max="10" step="0.1" value={moduleSize} onChange={(e) => setModuleSize(parseFloat(e.target.value))} className="w-full accent-purple-500 mt-2" />
-                      </div>
-                  </Panel>
-
-                  <Panel title="🛠️ Profile Shift (x)" defaultOpen={false}>
-                      <div className="text-xs text-slate-500 mb-4 pb-2 border-b border-slate-800">
-                          Thickens/thins teeth to prevent undercutting on small gears and precisely controls center distance.
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <label className="text-sm text-slate-300 font-medium">Sun Shift (xs)</label>
-                          <span className="text-sm font-mono text-sky-400">{sunShift.toFixed(2)}</span>
-                        </div>
-                        <input type="range" min="-0.5" max="1.0" step="0.01" value={sunShift} onChange={(e) => setSunShift(parseFloat(e.target.value))} className="w-full accent-sky-500" />
-                      </div>
-                      <div className="mt-4">
-                        <div className="flex justify-between mb-1">
-                          <label className="text-sm text-slate-300 font-medium">Planet Shift (xp)</label>
-                          <span className="text-sm font-mono text-sky-400">{planetShift.toFixed(2)}</span>
-                        </div>
-                        <input type="range" min="-0.5" max="1.0" step="0.01" value={planetShift} onChange={(e) => setPlanetShift(parseFloat(e.target.value))} className="w-full accent-sky-500" />
-                      </div>
-                  </Panel>
-
-                  <Panel title="📐 Dimensions & Holes" defaultOpen={true}>
-                      <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className="flex justify-between mb-1"><label className="text-xs text-slate-400">Thickness (Z)</label></div>
-                            <div className="flex flex-col gap-2"><NumberInput value={gearThickness} onChange={setGearThickness} min={5} max={50} widthClass="w-full" colorClass="text-indigo-300" /><input type="range" min="5" max="50" step="1" value={gearThickness} onChange={(e) => setGearThickness(parseInt(e.target.value))} className="w-full accent-indigo-400" /></div>
-                          </div>
-                          <div>
-                            <div className="flex justify-between mb-1"><label className="text-xs text-slate-400">Ring Wall</label></div>
-                            <div className="flex flex-col gap-2"><NumberInput value={ringThickness} onChange={setRingThickness} min={5} max={50} widthClass="w-full" colorClass="text-indigo-300" /><input type="range" min="5" max="50" step="1" value={ringThickness} onChange={(e) => setRingThickness(parseInt(e.target.value))} className="w-full accent-indigo-400" /></div>
-                          </div>
-                          <div>
-                            <div className="flex justify-between mb-1"><label className="text-xs text-slate-400">Sun Hole</label></div>
-                            <div className="flex flex-col gap-2"><NumberInput value={sunHole} onChange={setSunHole} min={0} max={50} step={0.5} widthClass="w-full" colorClass="text-amber-500" /><input type="range" min="0" max="50" step="0.5" value={sunHole} onChange={(e) => setSunHole(parseFloat(e.target.value))} className="w-full accent-amber-500" /></div>
-                          </div>
-                          <div>
-                            <div className="flex justify-between mb-1"><label className="text-xs text-slate-400">Planet Hole</label></div>
-                            <div className="flex flex-col gap-2"><NumberInput value={planetHole} onChange={setPlanetHole} min={0} max={50} step={0.5} widthClass="w-full" colorClass="text-blue-500" /><input type="range" min="0" max="50" step="0.5" value={planetHole} onChange={(e) => setPlanetHole(parseFloat(e.target.value))} className="w-full accent-blue-500" /></div>
-                          </div>
-                      </div>
-                  </Panel>
-
-                  <Panel title="🔬 Advanced Gear Profiling" defaultOpen={false}>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <label className="text-sm text-slate-300 font-medium">Pressure Angle</label>
-                          <span className="text-sm font-mono text-slate-400">{pressureAngle}°</span>
-                        </div>
-                        <input type="range" min="14.5" max="30" step="0.5" value={pressureAngle} onChange={(e) => setPressureAngle(parseFloat(e.target.value))} className="w-full accent-slate-400" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <label className="text-sm text-slate-300 font-medium">Clearance Coeff.</label>
-                          <span className="text-sm font-mono text-slate-400">{clearance.toFixed(2)}</span>
-                        </div>
-                        <input type="range" min="0.1" max="0.5" step="0.05" value={clearance} onChange={(e) => setClearance(parseFloat(e.target.value))} className="w-full accent-slate-400" />
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <label className="text-sm text-slate-300 font-medium">Backlash (Tol.)</label>
-                          <span className="text-sm font-mono text-slate-400">{backlash.toFixed(2)} mm</span>
-                        </div>
-                        <input type="range" min="0" max="1" step="0.05" value={backlash} onChange={(e) => setBacklash(parseFloat(e.target.value))} className="w-full accent-slate-400" />
-                      </div>
-                  </Panel>
-
-                  <Panel title="🎬 Environment Controls" defaultOpen={false}>
-                      <div className="mb-4">
-                          <label className="text-xs text-slate-400 font-medium block mb-2 uppercase tracking-wider">Fixed Kinematic Part</label>
-                          <div className="grid grid-cols-3 gap-2">
-                            {['ring', 'sun', 'carrier'].map(part => (
-                              <button
-                                key={part}
-                                onClick={() => setFixedPart(part)}
-                                className={`py-1.5 text-[11px] font-bold rounded uppercase tracking-wider transition-colors
-                                  ${fixedPart === part 
-                                    ? 'bg-slate-600 text-white' 
-                                    : 'bg-slate-950 text-slate-500 hover:bg-slate-800 border border-slate-800'}`}
-                              >
-                                {part}
-                              </button>
-                            ))}
-                          </div>
-                      </div>
-                      <div className="mb-4">
-                         <div className="flex justify-between mb-1">
-                            <label className="text-xs text-slate-400 font-medium uppercase tracking-wider">Input Speed</label>
-                          </div>
-                          <input 
-                            type="range" min="-100" max="100" step="1" 
-                            value={speed} 
-                            onChange={(e) => setSpeed(parseInt(e.target.value))}
-                            className="w-full accent-slate-400" 
-                          />
-                      </div>
-                      <div className="pt-2 border-t border-slate-800 space-y-3">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              checked={showCarrier}
-                              onChange={(e) => setShowCarrier(e.target.checked)}
-                              className="rounded bg-slate-900 border-slate-700 accent-emerald-500"
-                            />
-                            <span className="text-sm text-slate-300">Show Carrier Frame</span>
-                          </label>
-                      </div>
-                  </Panel>
-                  
-                  <Panel title="💾 Save & Load Profile" defaultOpen={false}>
-                      <div className="flex gap-2">
-                          <button onClick={exportSettings} className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 py-2 rounded text-xs font-bold text-slate-300 transition-colors">
-                              <Download className="w-3.5 h-3.5" /> Export JSON
-                          </button>
-                          <label className="flex-1 flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 py-2 rounded text-xs font-bold text-slate-300 text-center cursor-pointer transition-colors">
-                              <Save className="w-3.5 h-3.5" /> Import JSON
-                              <input type="file" accept=".json" className="hidden" onChange={importSettings} />
-                          </label>
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-2 pb-2 border-b border-slate-800 text-center">Settings are continually auto-saved to your browser.</div>
-                      <button onClick={resetDefaults} className="w-full mt-2 bg-red-950/40 hover:bg-red-900/60 border border-red-900/50 py-2 rounded text-xs font-bold text-red-400 transition-colors">
-                          Reset All to Defaults
-                      </button>
-                  </Panel>
-
-                </div>
-              </div>
-
-              {/* RIGHT PANEL - FUNNEL & SPECS */}
-              <div className={`absolute top-0 right-0 bottom-0 w-[340px] max-w-[100vw] bg-slate-900/95 backdrop-blur-xl border-l border-slate-800 flex flex-col z-30 transition-transform duration-300 shadow-2xl ${rightOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-                <div className="p-5 border-b border-slate-800 flex items-center justify-between shrink-0">
-                  <h2 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                    System Specifications
-                  </h2>
-                  <button onClick={() => setRightOpen(false)} className="p-1 text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-md">
-                      <XIcon className="w-5 h-5" />
-                  </button>
-                </div>
-
-                <div className="p-4 space-y-4 overflow-y-auto">
-                  {/* Highlighted Critical Stats */}
-                  <div className="bg-slate-950 p-4 rounded-lg border border-slate-800 shadow-inner space-y-3">
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-800">
-                      <span className="text-slate-400 text-sm font-medium">True Center Distance</span>
-                      <span className="font-mono text-emerald-400 font-bold text-lg">{r_c.toFixed(3)} <span className="text-xs text-slate-500">mm</span></span>
-                    </div>
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-800">
-                      <span className="text-slate-400 text-sm font-medium">Working PA (αw)</span>
-                      <span className="font-mono font-bold text-sky-400 text-lg">{(alphaW * 180 / Math.PI).toFixed(2)}°</span>
-                    </div>
-                    <div className="flex justify-between items-center pb-3 border-b border-slate-800">
-                      <span className="text-red-400 text-sm font-medium">Ring Teeth (R)</span>
-                      <span className="font-mono font-bold text-white text-lg">{ringTeeth}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-slate-400 text-sm font-medium">Gear Ratio</span>
-                      <span className="font-mono text-amber-400 font-semibold text-lg">{gearRatioText()}</span>
-                    </div>
-                  </div>
-
-                  {/* Detailed System Geometry Accordions */}
-                  <Panel title="System Geometry" defaultOpen={false}>
-                      <StatRow label="Module (Size)" value={moduleSize.toFixed(2)} symbol="m" />
-                      <StatRow label="Pressure Angle" value={`${pressureAngle}°`} symbol="α" />
-                      <StatRow label="Circular Pitch" value={(Math.PI * moduleSize).toFixed(3)} symbol="p" />
-                      <StatRow label="Base Pitch" value={(Math.PI * moduleSize * Math.cos(pressureAngle * Math.PI / 180)).toFixed(3)} symbol="pb" />
-                      <StatRow label="Clearance" value={(clearance * moduleSize).toFixed(3)} symbol="c" />
-                  </Panel>
-
-                  <Panel title="Sun Gear (Center)" defaultOpen={false}>
-                      <StatRow label="Teeth" value={sunTeeth} symbol="z" />
-                      <StatRow label="Profile Shift" value={sunShift.toFixed(2)} symbol="x" />
-                      <StatRow label="Pitch Dia." value={(sunTeeth * moduleSize).toFixed(3)} symbol="d" />
-                      <StatRow label="Base Dia." value={(sunTeeth * moduleSize * Math.cos(pressureAngle * Math.PI / 180)).toFixed(3)} symbol="db" />
-                      <StatRow label="Outer Dia." value={((sunTeeth + 2 + 2*sunShift) * moduleSize).toFixed(3)} symbol="da" />
-                      <StatRow label="Root Dia." value={(sunTeeth * moduleSize - 2 * (1 + clearance - sunShift) * moduleSize).toFixed(3)} symbol="df" />
-                  </Panel>
-
-                  <Panel title="Planet Gears (Orbiters)" defaultOpen={false}>
-                      <StatRow label="Teeth" value={planetTeeth} symbol="z" />
-                      <StatRow label="Profile Shift" value={planetShift.toFixed(2)} symbol="x" />
-                      <StatRow label="Pitch Dia." value={(planetTeeth * moduleSize).toFixed(3)} symbol="d" />
-                      <StatRow label="Base Dia." value={(planetTeeth * moduleSize * Math.cos(pressureAngle * Math.PI / 180)).toFixed(3)} symbol="db" />
-                      <StatRow label="Outer Dia." value={((planetTeeth + 2 + 2*planetShift) * moduleSize).toFixed(3)} symbol="da" />
-                      <StatRow label="Root Dia." value={(planetTeeth * moduleSize - 2 * (1 + clearance - planetShift) * moduleSize).toFixed(3)} symbol="df" />
-                  </Panel>
-
-                  <Panel title="Ring Gear (Outer)" defaultOpen={false}>
-                      <StatRow label="Teeth" value={ringTeeth} symbol="z" />
-                      <StatRow label="Pitch Dia." value={(ringTeeth * moduleSize).toFixed(3)} symbol="d" />
-                      <StatRow label="Base Dia." value={(ringTeeth * moduleSize * Math.cos(pressureAngle * Math.PI / 180)).toFixed(3)} symbol="db" />
-                      <StatRow label="Inner Dia. (Tip)" value={((ringTeeth - 2) * moduleSize).toFixed(3)} symbol="da" />
-                      <StatRow label="Root Dia." value={(ringTeeth * moduleSize + 2 * (1 + clearance) * moduleSize).toFixed(3)} symbol="df" />
-                      <StatRow label="Outer Casing Dia." value={(ringTeeth * moduleSize + ringThickness * 2).toFixed(3)} />
-                  </Panel>
-
-                  {/* THE MONETIZATION FUNNEL */}
-                  <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 mt-6 space-y-4">
-                      <div className="text-center pb-4 border-b border-slate-700">
-                          <Sparkles className="w-6 h-6 text-amber-400 mx-auto mb-2" />
-                          <h3 className="text-white font-bold mb-2">Support the Developer</h3>
-                          <p className="text-slate-400 text-xs leading-relaxed">If this free tool saved you hours of CAD sketching, the best way to support the project is to grab a lifetime upgrade!</p>
-                      </div>
-                      <div className="space-y-3">
-                          <div className="bg-indigo-950/30 border border-indigo-500/30 p-3 rounded hover:border-indigo-400 transition-colors group">
-                              <p className="text-indigo-300 font-bold text-xs uppercase mb-1">Tier 2: Maker Edition</p>
-                              <p className="text-slate-400 text-xs mb-2">Unlocks 3D Mesh (OBJ/STL), Helix Angles, & Bevels.</p>
-                              <a href="https://m87.lemonsqueezy.com/checkout/buy/25be5fef-a293-4d93-89ea-2c64810bb275" target="_blank" rel="noopener noreferrer" className="text-indigo-400 group-hover:text-indigo-300 text-xs font-bold flex items-center gap-1">Get Maker Tier $19.99 Lifetime<ChevronRight className="w-3 h-3"/></a>
-                          </div>
-                          <div className="bg-amber-950/30 border border-amber-500/30 p-3 rounded hover:border-amber-400 transition-colors group">
-                              <p className="text-amber-300 font-bold text-xs uppercase mb-1">Tier 3: Pro Edition</p>
-                              <p className="text-slate-400 text-xs mb-2">Unlocks Solid B-Rep STEP, QC (MOP), & Stress Analytics.</p>
-                              <a href="https://m87.lemonsqueezy.com/checkout/buy/63d6f42c-d4bf-4de5-b1c3-5c9cb39d05a1" target="_blank" rel="noopener noreferrer" className="text-amber-400 group-hover:text-amber-300 text-xs font-bold flex items-center gap-1">Get Pro Tier $49.99 Lifetime<ChevronRight className="w-3 h-3"/></a>
-                          </div>
-                      </div>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          );
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); 
+            a.download = `planetary-gear-S${State.sunTeeth}-P${State.planetTeeth}${target === 'all' ? '' : `_${target.charAt(0).toUpperCase() + target.slice(1)}`}.svg`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        function downloadDXF() {
+            const target = State.exportTarget || 'all';
+            const pIsEven = State.planetTeeth % 2 === 0;
+            const phi_p = pIsEven ? Math.PI / State.planetTeeth : 0, phi_r = pIsEven ? Math.PI / Derived.ringTeeth : 0;
+            let dxf = "0\nSECTION\n2\nENTITIES\n";
+            const addLine = (x1, y1, x2, y2, layer) => { dxf += `0\nLINE\n8\n${layer}\n10\n${x1.toFixed(4)}\n20\n${y1.toFixed(4)}\n11\n${x2.toFixed(4)}\n21\n${y2.toFixed(4)}\n`; };
+            const addCircle = (cx, cy, r, layer) => { dxf += `0\nCIRCLE\n8\n${layer}\n10\n${cx.toFixed(4)}\n20\n${cy.toFixed(4)}\n40\n${r.toFixed(4)}\n`; };
+
+            if (target === 'all' || target === 'ring') {
+                const ringPts = flattenSegments(generateGearSegments(Derived.ringTeeth, Derived.r_r, State.moduleSize, true, State.ringShift, false, 'High'));
+                const rot = target === 'all' ? phi_r : 0;
+                for(let i=0; i<ringPts.length-1; i++) addLine(ringPts[i].x * Math.cos(rot) - ringPts[i].y * Math.sin(rot), ringPts[i].x * Math.sin(rot) + ringPts[i].y * Math.cos(rot), ringPts[i+1].x * Math.cos(rot) - ringPts[i+1].y * Math.sin(rot), ringPts[i+1].x * Math.sin(rot) + ringPts[i+1].y * Math.cos(rot), 'RingGear');
+                addLine(ringPts[ringPts.length-1].x * Math.cos(rot) - ringPts[ringPts.length-1].y * Math.sin(rot), ringPts[ringPts.length-1].x * Math.sin(rot) + ringPts[ringPts.length-1].y * Math.cos(rot), ringPts[0].x * Math.cos(rot) - ringPts[0].y * Math.sin(rot), ringPts[0].x * Math.sin(rot) + ringPts[0].y * Math.cos(rot), 'RingGear');
+                addCircle(0, 0, Derived.r_r + State.ringThickness, 'RingCasing');
+            }
+
+            if (target === 'all' || target === 'sun') {
+                const sunPts = flattenSegments(generateGearSegments(State.sunTeeth, Derived.r_s, State.moduleSize, false, State.sunShift, false, 'High'));
+                for(let i=0; i<sunPts.length-1; i++) addLine(sunPts[i].x, sunPts[i].y, sunPts[i+1].x, sunPts[i+1].y, 'SunGear');
+                addLine(sunPts[sunPts.length-1].x, sunPts[sunPts.length-1].y, sunPts[0].x, sunPts[0].y, 'SunGear');
+                if(Derived.safeSunHole > 0) addCircle(0, 0, Derived.safeSunHole/2, 'SunHole');
+            }
+
+            if (target === 'all' || target === 'planet') {
+                const pPts = flattenSegments(generateGearSegments(State.planetTeeth, Derived.r_p, State.moduleSize, false, State.planetShift, false, 'High'));
+                if (target === 'all') {
+                    for (let i = 0; i < State.numPlanets; i++) {
+                        const alpha_i = i * 2 * Math.PI / State.numPlanets;
+                        const px = Derived.r_c * Math.cos(alpha_i), py = Derived.r_c * Math.sin(alpha_i);
+                        const theta_pi = alpha_i + (0 - alpha_i) * (-State.sunTeeth / State.planetTeeth) + phi_p;
+                        for(let j=0; j<pPts.length-1; j++) addLine(pPts[j].x * Math.cos(theta_pi) - pPts[j].y * Math.sin(theta_pi) + px, pPts[j].x * Math.sin(theta_pi) + pPts[j].y * Math.cos(theta_pi) + py, pPts[j+1].x * Math.cos(theta_pi) - pPts[j+1].y * Math.sin(theta_pi) + px, pPts[j+1].x * Math.sin(theta_pi) + pPts[j+1].y * Math.cos(theta_pi) + py, `PlanetGear_${i+1}`);
+                        addLine(pPts[pPts.length-1].x * Math.cos(theta_pi) - pPts[pPts.length-1].y * Math.sin(theta_pi) + px, pPts[pPts.length-1].x * Math.sin(theta_pi) + pPts[pPts.length-1].y * Math.cos(theta_pi) + py, pPts[0].x * Math.cos(theta_pi) - pPts[0].y * Math.sin(theta_pi) + px, pPts[0].x * Math.sin(theta_pi) + pPts[0].y * Math.cos(theta_pi) + py, `PlanetGear_${i+1}`);
+                        if(Derived.safePlanetHole > 0) addCircle(px, py, Derived.safePlanetHole/2, `PlanetHole_${i+1}`);
+                    }
+                } else {
+                    for(let j=0; j<pPts.length-1; j++) addLine(pPts[j].x, pPts[j].y, pPts[j+1].x, pPts[j+1].y, 'PlanetGear');
+                    addLine(pPts[pPts.length-1].x, pPts[pPts.length-1].y, pPts[0].x, pPts[0].y, 'PlanetGear');
+                    if(Derived.safePlanetHole > 0) addCircle(0, 0, Derived.safePlanetHole/2, 'PlanetHole');
+                }
+            }
+            dxf += "0\nENDSEC\n0\nEOF\n";
+            const blob = new Blob([dxf], { type: 'application/dxf' });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); 
+            a.download = `planetary-gear-2D-S${State.sunTeeth}-P${State.planetTeeth}${target === 'all' ? '' : `_${target.charAt(0).toUpperCase() + target.slice(1)}`}.dxf`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+
+        async function downloadOfflineVersion() {
+            const btn = document.getElementById('btn-offline');
+            if (btn) btn.textContent = "Fetching Dependencies...";
+            try {
+                const threeRes = await fetch('https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js');
+                const threeJs = await threeRes.text();
+                const orbitRes = await fetch('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js');
+                const orbitJs = await orbitRes.text();
+
+                if (btn) btn.textContent = "Packaging App...";
+                let html = "";
+                try {
+                    const htmlRes = await fetch(window.location.href);
+                    html = await htmlRes.text();
+                } catch (e) {
+                    const container = document.getElementById('canvas-container');
+                    const oldHTML = container.innerHTML; container.innerHTML = ''; 
+                    html = '<!DOCTYPE html>\n<html lang="en">\n' + document.documentElement.innerHTML + '\n</html>';
+                    container.innerHTML = oldHTML; 
+                }
+
+                const safeThree = threeJs.replace(/<\/script>/gi, '<\\/script>');
+                const safeOrbit = orbitJs.replace(/<\/script>/gi, '<\\/script>');
+                html = html.replace(/<script[^>]*three\.min\.js[^>]*><\/script>/i, () => `<script>\n${safeThree}\n<` + `/script>`);
+                html = html.replace(/<script[^>]*OrbitControls\.js[^>]*><\/script>/i, () => `<script>\n${safeOrbit}\n<` + `/script>`);
+                html = html.replace(/<button[^>]*id="btn-offline"[^>]*>.*?<\/button>/i, '');
+
+                const blob = new Blob([html], { type: 'text/html' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `PlanetaryGear_Standalone_Offline.html`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+                if (btn) btn.textContent = "Standalone HTML Saved!";
+                setTimeout(() => { if (btn) btn.textContent = "Download Standalone/Offline App"; }, 3000);
+            } catch (err) { alert("Failed to fetch dependencies."); if (btn) btn.textContent = "Download Standalone/Offline App"; }
+        }
+
+        // --- THREE.JS ENGINE ---
+        function initThreeJS() {
+            const container = document.getElementById('canvas-container');
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            Engine.renderer = renderer;
+
+            const scene = new THREE.Scene();
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8); dirLight.position.set(100, -100, 200); scene.add(dirLight);
+            const dirLight2 = new THREE.DirectionalLight(0x90b0d0, 0.4); dirLight2.position.set(-100, 100, -100); scene.add(dirLight2);
+            Engine.scene = scene;
+
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 10000);
+            camera.up.set(0, 0, 1); Engine.camera = camera;
+
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true; controls.dampingFactor = 0.05; controls.enablePan = false;
+            controls.addEventListener('change', () => { Engine.renderRequest = true; });
+            Engine.controls = controls;
+
+            let isPanning = false, lastMouse = {x:0, y:0};
+            renderer.domElement.addEventListener('pointerdown', e => { if(e.button===2){ e.preventDefault(); isPanning=true; lastMouse={x:e.clientX, y:e.clientY}; renderer.domElement.setPointerCapture(e.pointerId); } });
+            renderer.domElement.addEventListener('pointermove', e => { if(isPanning) { e.preventDefault(); Engine.panOffset.x -= (e.clientX - lastMouse.x); Engine.panOffset.y -= (e.clientY - lastMouse.y); lastMouse={x:e.clientX, y:e.clientY}; updateProjection(); Engine.renderRequest = true; } });
+            window.addEventListener('pointerup', e => { if(e.button===2 && isPanning){ e.preventDefault(); isPanning=false; renderer.domElement.releasePointerCapture(e.pointerId); } });
+            renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+            Engine.mats = {
+                sun: new THREE.MeshStandardMaterial({ color: 0xF59E0B, metalness: 0.2, roughness: 0.4 }),
+                ring: new THREE.MeshStandardMaterial({ color: 0xEF4444, metalness: 0.2, roughness: 0.4, transparent: true, opacity: 0.85, side: THREE.DoubleSide }),
+                carrier: new THREE.MeshStandardMaterial({ color: 0x10B981, transparent: true, opacity: 0.2, depthWrite: false }),
+                planets: [0x3B82F6, 0x8B5CF6, 0xEC4899, 0x14B8A6, 0xF97316, 0x06B6D4, 0xD946EF, 0x84CC16].map(c => new THREE.MeshStandardMaterial({ color: c, metalness: 0.2, roughness: 0.4 }))
+            };
+
+            window.addEventListener('resize', () => { renderer.setSize(container.clientWidth, container.clientHeight); updateProjection(); Engine.renderRequest = true; });
+            Engine.initialized = true;
+        }
+
+        function createThreeBufferGeometry(geomData) {
+            const { vertices, faces } = geomData; const geometry = new THREE.BufferGeometry(); const posArray = [];
+            faces.forEach(f => { posArray.push(vertices[f[0]].x, vertices[f[0]].y, vertices[f[0]].z, vertices[f[1]].x, vertices[f[1]].y, vertices[f[1]].z, vertices[f[2]].x, vertices[f[2]].y, vertices[f[2]].z); });
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posArray), 3)); geometry.computeVertexNormals();
+            return geometry;
+        }
+
+        function disposeNode(node) {
+            if (!node) return; if (node.geometry && typeof node.geometry.dispose === 'function') node.geometry.dispose();
+            if (node.material) { if (Array.isArray(node.material)) node.material.forEach(m => { if (m && typeof m.dispose === 'function') m.dispose(); }); else if (typeof node.material.dispose === 'function') node.material.dispose(); }
+            if (node.children && Array.isArray(node.children)) [...node.children].forEach(child => disposeNode(child));
+        }
+
+        function rebuildMeshes() {
+            if (!Engine.initialized) return; const scene = Engine.scene, mats = Engine.mats;
+            if (Engine.meshes.sun) { scene.remove(Engine.meshes.sun); disposeNode(Engine.meshes.sun); }
+            if (Engine.meshes.ring) { scene.remove(Engine.meshes.ring); disposeNode(Engine.meshes.ring); }
+            if (Engine.meshes.carrier) { scene.remove(Engine.meshes.carrier); disposeNode(Engine.meshes.carrier); }
+            if (Engine.meshes.planets) Engine.meshes.planets.forEach(p => { scene.remove(p); disposeNode(p); });
+            Engine.meshes = { planets: [] };
+
+            const pIsEven = State.planetTeeth % 2 === 0, phi_p = pIsEven ? Math.PI / State.planetTeeth : 0;
+
+            const sunPts = flattenSegments(generateGearSegments(State.sunTeeth, Derived.r_s, State.moduleSize, false, State.sunShift, true));
+            Engine.meshes.sun = new THREE.Mesh(createThreeBufferGeometry(buildBasic3DGeometry(sunPts, Math.max(0.01, Derived.safeSunHole / 2), false, Derived.r_s, 0, 0)), mats.sun);
+            scene.add(Engine.meshes.sun);
+
+            const ringPts = flattenSegments(generateGearSegments(Derived.ringTeeth, Derived.r_r, State.moduleSize, true, State.ringShift, true));
+            Engine.meshes.ring = new THREE.Mesh(createThreeBufferGeometry(buildBasic3DGeometry(ringPts, Derived.r_r + State.ringThickness, true, Derived.r_r, 0, 0)), mats.ring);
+            scene.add(Engine.meshes.ring);
+
+            const planetPts = flattenSegments(generateGearSegments(State.planetTeeth, Derived.r_p, State.moduleSize, false, State.planetShift, true));
+            const basePlanetGeom = createThreeBufferGeometry(buildBasic3DGeometry(planetPts, Math.max(0.01, Derived.safePlanetHole / 2), false, Derived.r_p, 0, 0));
+
+            for(let i=0; i<State.numPlanets; i++) {
+                const alpha_i = i * 2 * Math.PI / State.numPlanets;
+                const pMesh = new THREE.Mesh(basePlanetGeom, mats.planets[i % mats.planets.length]);
+                pMesh.position.set(Derived.r_c * Math.cos(alpha_i), Derived.r_c * Math.sin(alpha_i), 0);
+                pMesh.rotation.z = alpha_i + (0 - alpha_i) * (-State.sunTeeth / State.planetTeeth) + phi_p;
+                scene.add(pMesh); Engine.meshes.planets.push(pMesh);
+            }
+
+            if (State.showCarrier) {
+                const cGroup = new THREE.Group(); const cMesh = new THREE.Mesh(new THREE.CylinderGeometry(Derived.r_c + State.moduleSize, Derived.r_c + State.moduleSize, 2, 64), mats.carrier);
+                cMesh.rotation.x = Math.PI / 2; cGroup.add(cMesh); scene.add(cGroup); Engine.meshes.carrier = cGroup;
+            }
+
+            adjustCameraDistance(); Engine.renderRequest = true;
+        }
+
+        function updateProjection() {
+            if (!Engine.camera) return; const container = document.getElementById('canvas-container'), w = container.clientWidth, h = container.clientHeight;
+            Engine.camera.aspect = w / h;
+            if (Engine.panOffset.x !== 0 || Engine.panOffset.y !== 0) Engine.camera.setViewOffset(w, h, Engine.panOffset.x, Engine.panOffset.y, w, h);
+            else Engine.camera.clearViewOffset();
+            Engine.camera.updateProjectionMatrix();
+        }
+
+        function adjustCameraDistance() {
+            if (!Engine.camera || !Engine.controls) return;
+            const targetDistance = (Derived.r_r + State.ringThickness + (State.moduleSize * 2)) / Math.sin(Math.min(Engine.camera.fov * (Math.PI / 180), 2 * Math.atan(Math.tan(Engine.camera.fov * (Math.PI / 180) / 2) * Engine.camera.aspect)) / 2);
+            const currentPos = Engine.camera.position.clone(), target = Engine.controls.target.clone(), direction = currentPos.sub(target).normalize();
+            if (direction.lengthSq() < 0.01) direction.set(0, -1, 1).normalize();
+            Engine.camera.position.copy(target.add(direction.multiplyScalar(targetDistance))); Engine.controls.update(); Engine.renderRequest = true;
+        }
+
+        function resetCameraView() {
+            if (!Engine.camera || !Engine.controls) return;
+            const fovRad = Engine.camera.fov * (Math.PI / 180);
+            const offset = ((Derived.r_r + State.ringThickness + (State.moduleSize * 2)) / Math.sin(Math.min(fovRad, 2 * Math.atan(Math.tan(fovRad / 2) * Engine.camera.aspect)) / 2)) / Math.sqrt(2); 
+            Engine.camera.position.set(0, -offset, offset); Engine.controls.target.set(0, 0, 0); Engine.controls.update();
+            Engine.panOffset = {x:0, y:0}; updateProjection(); Engine.renderRequest = true;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (State.isPlaying) { Engine.time += 1; Engine.renderRequest = true; }
+            if (Engine.controls) Engine.controls.update();
+
+            if (Engine.renderRequest) {
+                const { w_s, w_c, w_r } = calculateSpeeds();
+                const theta_s = w_s * Engine.time, theta_c = w_c * Engine.time, theta_r = w_r * Engine.time;
+                const pIsEven = State.planetTeeth % 2 === 0, phi_p = pIsEven ? Math.PI / State.planetTeeth : 0, phi_r = pIsEven ? Math.PI / Derived.ringTeeth : 0; 
+
+                if (Engine.meshes.sun) Engine.meshes.sun.rotation.z = theta_s;
+                if (Engine.meshes.ring) Engine.meshes.ring.rotation.z = theta_r + phi_r; 
+                if (Engine.meshes.carrier) Engine.meshes.carrier.rotation.z = theta_c;
+                
+                if (Engine.meshes.planets) {
+                    Engine.meshes.planets.forEach((pMesh, i) => {
+                        const alpha_i = theta_c + i * 2 * Math.PI / State.numPlanets;
+                        pMesh.position.x = Derived.r_c * Math.cos(alpha_i); pMesh.position.y = Derived.r_c * Math.sin(alpha_i);
+                        pMesh.rotation.z = alpha_i + (theta_s - alpha_i) * (-State.sunTeeth / State.planetTeeth) + phi_p;
+                    });
+                }
+                if (Engine.renderer && Engine.scene && Engine.camera) Engine.renderer.render(Engine.scene, Engine.camera);
+                if (!State.isPlaying) Engine.renderRequest = false;
+            }
+        }
+
+        window.onload = () => { calculateDerivedState(); setupDOMListeners(); updateDOM(); initThreeJS(); resetCameraView(); rebuildMeshes(); animate(); if (window.innerWidth < 1024) { togglePanel('panel-left', true); togglePanel('panel-right', true); } };
     </script>
 </body>
 </html>
