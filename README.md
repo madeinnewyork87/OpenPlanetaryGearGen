@@ -2,7 +2,7 @@
 
 A mathematically precise, browser-based planetary gear generator. Visualize assemblies in real-time and export perfect 2D profiles (SVG, DXF) for laser cutting, CNC routing, and blueprinting.
 
-\!\[Planetary Gear Engine Preview\](\[Insert link to a cool GIF of the gears spinning here\])
+<img width="400" height="400" alt="Planetary_Gear_PRO" src="https://github.com/user-attachments/assets/2b70e860-a737-49f5-b7f0-0b5d653ca819" />
 
 ## **🚀 Quick Start**
 
