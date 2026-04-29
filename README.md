@@ -2,8 +2,6 @@
 
 A mathematically precise, browser-based planetary gear generator. Visualize assemblies in real-time and export perfect 2D profiles (SVG, DXF) for laser cutting, CNC routing, and blueprinting.
 
-<img width="400" height="400" alt="Planetary_Gear_PRO" src="https://github.com/user-attachments/assets/2b70e860-a737-49f5-b7f0-0b5d653ca819" />
-
 ## **🚀 Quick Start**
 
 Try the tool right now: https://madeinnewyork87.github.io/OpenPlanetaryGearGen/GearGen-T1.html
@@ -44,6 +42,8 @@ Built for professional mechanical engineers and CAD designers.
 * **Profile Shifting (![][image1]):** Independently adjust sun and planet profile shifts to dictate exact operative center distances and prevent undercutting.  
 * **Quality Control (MOP):** Dynamically calculates Measurement Over Pins based on your designated pin diameter.  
 * **Stress Analytics:** Real-time Lewis Root Stress (MPa) estimations based on input torque (Nm).
+
+<img width="400" height="400" alt="Planetary_Gear_PRO" src="https://github.com/user-attachments/assets/2b70e860-a737-49f5-b7f0-0b5d653ca819" />
 
 ### **Feature Comparison**
 
