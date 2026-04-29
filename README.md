@@ -1,5 +1,7 @@
 # **⚙️ Planetary Gear Engine (Community Edition)**
 
+<img width="400" height="400" alt="Planetary_Gear_Gen_T1" src="https://github.com/user-attachments/assets/701e156d-261a-4c76-baa7-844ff80fe769" />
+
 A mathematically precise, browser-based planetary gear generator. Visualize assemblies in real-time and export perfect 2D profiles (SVG, DXF) for laser cutting, CNC routing, and blueprinting.
 
 ## **🚀 Quick Start**
